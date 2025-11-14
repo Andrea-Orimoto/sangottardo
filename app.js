@@ -98,7 +98,7 @@ function renderGrid(loadMore = false) {
 
 function filterItems() {
     const q = (document.getElementById('search').value || '').toLowerCase().trim();
-    const locFilter = document.getElementById('catFilter').value; // Now uses Location
+    const locFilter = document.getElementById('catFilter').value;
   
     return allItems.filter(item => {
       const searchText = (
@@ -109,17 +109,18 @@ function filterItems() {
       ).toLowerCase();
   
       const matchSearch = !q || searchText.includes(q);
-      const matchLocation = !locFilter || item.Location === locFilter;
+      // Looser location match: trim & ignore case
+      const matchLocation = !locFilter || (item.Location || '').trim().toLowerCase() === locFilter.toLowerCase();
   
       return matchSearch && matchLocation;
     });
   }
 
-function setupFilters() {
+  function setupFilters() {
     const sel = document.getElementById('catFilter');
-    sel.innerHTML = '<option value="">All Categories</option>'; // Reset
+    sel.innerHTML = '<option value="">All Categories</option>'; // Add "All" option back!
   
-    // Use Location field (not Categories!)
+    // Use Location field for dropdown
     const locations = [...new Set(allItems.map(i => i.Location).filter(Boolean))].sort();
     locations.forEach(loc => {
       const opt = document.createElement('option');
@@ -133,12 +134,14 @@ function setupFilters() {
     document.getElementById('search').addEventListener('input', (e) => {
       clearTimeout(timeout);
       timeout = setTimeout(() => {
+        console.log(`Search: "${e.target.value}"`); // Debug
         displayed = 0;
         renderGrid();
       }, 300);
     });
   
     document.getElementById('catFilter').addEventListener('change', () => {
+      console.log(`Category filter: ${document.getElementById('catFilter').value}`); // Debug
       displayed = 0;
       renderGrid();
     });
