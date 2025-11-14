@@ -1,3 +1,22 @@
 .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
 .scrollbar-hide::-webkit-scrollbar { display: none; }
 .carousel img { scroll-snap-align: start; min-width: 100%; height: auto; }
+/* Keep cards consistent in grid */
+#grid > div {
+    display: flex;
+    flex-direction: column;
+    background: white;
+    border-radius: 0.5rem;
+    overflow: hidden;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    transition: box-shadow 0.2s;
+  }
+  
+  #grid > div:hover {
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  }
+  
+  /* Image container */
+  #grid > div > div:first-child {
+    flex-shrink: 0;
+  }
