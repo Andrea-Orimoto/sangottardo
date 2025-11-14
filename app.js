@@ -97,46 +97,52 @@ function renderGrid(loadMore = false) {
 }
 
 function filterItems() {
-  const q = (document.getElementById('search').value || '').toLowerCase().trim();
-  const cat = document.getElementById('catFilter').value;
+    const q = (document.getElementById('search').value || '').toLowerCase().trim();
+    const locFilter = document.getElementById('catFilter').value; // Now uses Location
   
-  return allItems.filter(item => {
-    const searchText = (item.Item + ' ' + (item.Categories || '') + ' ' + (item.Notes || '')).toLowerCase();
-    const matchSearch = !q || searchText.includes(q);
-    const matchCat = !cat || item.Categories === cat;
-    return matchSearch && matchCat;
-  });
-}
+    return allItems.filter(item => {
+      const searchText = (
+        item.Item + ' ' +
+        (item.Location || '') + ' ' +
+        (item.Categories || '') + ' ' +
+        (item.Notes || '')
+      ).toLowerCase();
+  
+      const matchSearch = !q || searchText.includes(q);
+      const matchLocation = !locFilter || item.Location === locFilter;
+  
+      return matchSearch && matchLocation;
+    });
+  }
 
 function setupFilters() {
-  const sel = document.getElementById('catFilter');
-  sel.innerHTML = '<option value="">All Categories</option>'; // Reset
+    const sel = document.getElementById('catFilter');
+    sel.innerHTML = '<option value="">All Categories</option>'; // Reset
   
-  const cats = [...new Set(allItems.map(i => i.Categories).filter(Boolean))].sort();
-  cats.forEach(c => {
-    const opt = document.createElement('option');
-    opt.value = c;
-    opt.textContent = c;
-    sel.appendChild(opt);
-  });
+    // Use Location field (not Categories!)
+    const locations = [...new Set(allItems.map(i => i.Location).filter(Boolean))].sort();
+    locations.forEach(loc => {
+      const opt = document.createElement('option');
+      opt.value = loc;
+      opt.textContent = loc;
+      sel.appendChild(opt);
+    });
   
-  // Debounced search (wait 300ms after typing)
-  let timeout;
-  document.getElementById('search').addEventListener('input', (e) => {
-    clearTimeout(timeout);
-    timeout = setTimeout(() => {
-      console.log(`Search: "${e.target.value}"`); // Debug
+    // Debounced search
+    let timeout;
+    document.getElementById('search').addEventListener('input', (e) => {
+      clearTimeout(timeout);
+      timeout = setTimeout(() => {
+        displayed = 0;
+        renderGrid();
+      }, 300);
+    });
+  
+    document.getElementById('catFilter').addEventListener('change', () => {
       displayed = 0;
       renderGrid();
-    }, 300);
-  });
-  
-  document.getElementById('catFilter').addEventListener('change', () => {
-    console.log(`Category filter: ${document.getElementById('catFilter').value}`); // Debug
-    displayed = 0;
-    renderGrid();
-  });
-}
+    });
+  }
 
 function clearFilters() {
   document.getElementById('search').value = '';
@@ -149,12 +155,12 @@ function clearFilters() {
 function openModal(item) {
   document.getElementById('modalTitle').textContent = item.Item;
   document.getElementById('modalDesc').innerHTML = `
-    <strong>UUID:</strong> ${item.UUID}<br>
-    <strong>Location:</strong> ${item.Location || 'N/A'}<br>
-    <strong>Categories:</strong> ${item.Categories || 'N/A'}<br>
-    ${item.Notes ? `<strong>Notes:</strong> ${item.Notes}<br>` : ''}
-    ${item['Purchase Date'] ? `<strong>Purchased:</strong> ${item['Purchase Date']}<br>` : ''}
-  `;
+  <strong>UUID:</strong> ${item.UUID}<br>
+  <strong>Location:</strong> ${item.Location || 'N/A'}<br>
+  <strong>Scatola:</strong> ${item.Categories || '—'}<br>
+  ${item.Notes ? `<strong>Notes:</strong> ${item.Notes}<br>` : ''}
+  ${item['Purchase Date'] ? `<strong>Purchased:</strong> ${item['Purchase Date']}<br>` : ''}
+`;
 
   const carousel = document.getElementById('carousel');
   carousel.innerHTML = '';
