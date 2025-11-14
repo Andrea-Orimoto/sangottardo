@@ -1,65 +1,85 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Inventario San Gottardo</title>
-  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
-  <link href="style.css" rel="stylesheet">
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Inventario San Gottardo</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <link href="style.css?1" rel="stylesheet">
 </head>
+
 <body class="bg-gray-50 text-gray-800">
-  <div class="container mx-auto p-4">
-    <header class="flex justify-between items-center mb-8">
-      <h1 class="text-3xl font-bold">Inventario San Gottardo</h1>
-      <div class="flex gap-2">
-        <button id="cartBtn" class="bg-indigo-600 text-white px-4 py-2 rounded">Cart (<span id="cartCount">0</span>)</button>
-        <a href="admin.html" class="bg-gray-700 text-white px-4 py-2 rounded hidden" id="adminLink">Admin</a>
-      </div>
-    </header>
+    <div class="container mx-auto p-4">
+        <header class="flex justify-between items-center mb-8">
+            <h1 class="text-3xl font-bold">Inventario San Gottardo</h1>
+            <div class="flex gap-2">
+                <button id="cartBtn" class="bg-indigo-600 text-white px-4 py-2 rounded">Cart (<span
+                        id="cartCount">0</span>)</button>
+                <a href="admin.html" class="bg-gray-700 text-white px-4 py-2 rounded hidden" id="adminLink">Admin</a>
+            </div>
+        </header>
 
-    <!-- Filters -->
-    <div class="mb-6 flex flex-wrap gap-2">
-      <input type="text" id="search" placeholder="Search…" class="p-2 border rounded flex-1 min-w-[200px]">
-      <select id="catFilter" class="p-2 border rounded"><option value="">All Categories</option></select>
-      <button id="clearFilters" class="bg-gray-300 px-3 py-2 rounded">Clear</button>
-    </div>
-
-    <!-- Grid -->
-    <div id="grid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6"></div>
-
-    <!-- Load more -->
-    <div class="text-center mt-8">
-      <button id="loadMore" class="bg-indigo-600 text-white px-6 py-2 rounded hidden">Load More</button>
-    </div>
-
-    <!-- Cart sidebar -->
-    <div id="cartSidebar" class="fixed right-0 top-0 h-full w-80 bg-white shadow-lg transform translate-x-full transition-transform p-4 overflow-y-auto">
-      <button id="closeCart" class="float-right text-2xl">&times;</button>
-      <h2 class="text-xl font-bold mb-4">Your Cart</h2>
-      <div id="cartItems"></div>
-      <button id="saveCartBtn" class="mt-4 w-full bg-green-600 text-white py-2 rounded">Save Cart to Server</button>
-      <p id="saveMsg" class="mt-2 text-sm"></p>
-    </div>
-
-    <!-- Modal -->
-    <div id="modal" class="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center hidden z-50">
-      <div class="bg-white max-w-3xl w-full m-4 rounded overflow-hidden relative">
-        <button id="closeModal" class="absolute top-2 right-2 text-2xl bg-white rounded-full w-8 h-8">&times;</button>
-        <div class="flex">
-          <div class="w-2/3 p-4">
-            <div class="carousel overflow-x-auto flex snap-x snap-mandatory scrollbar-hide" id="carousel"></div>
-          </div>
-          <div class="w-1/3 p-4 border-l">
-            <h2 id="modalTitle" class="text-xl font-bold mb-2"></h2>
-            <p id="modalDesc" class="text-sm mb-4"></p>
-            <button id="addToCartBtn" class="bg-indigo-600 text-white w-full py-2 rounded">Add to Cart</button>
-          </div>
+        <!-- Filters -->
+        <div class="mb-6 flex flex-wrap gap-2">
+            <input type="text" id="search" placeholder="Search…" class="p-2 border rounded flex-1 min-w-[200px]">
+            <select id="catFilter" class="p-2 border rounded">
+                <option value="">All Categories</option>
+            </select>
+            <button id="clearFilters" class="bg-gray-300 px-3 py-2 rounded">Clear</button>
         </div>
-      </div>
-    </div>
-  </div>
 
-  <script src="https://unpkg.com/papaparse@5.4.1/papaparse.min.js"></script>
-  <script src="app.js"></script>
+        <!-- Grid -->
+        <div id="grid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6"></div>
+
+        <!-- Load more -->
+        <div class="text-center mt-8">
+            <button id="loadMore" class="bg-indigo-600 text-white px-6 py-2 rounded hidden">Load More</button>
+        </div>
+
+        <!-- Cart sidebar -->
+        <div id="cartSidebar"
+            class="fixed right-0 top-0 h-full w-80 bg-white shadow-lg transform translate-x-full transition-transform p-4 overflow-y-auto">
+            <button id="closeCart" class="float-right text-2xl">&times;</button>
+            <h2 class="text-xl font-bold mb-4">Your Cart</h2>
+            <div id="cartItems"></div>
+            <button id="saveCartBtn" class="mt-4 w-full bg-green-600 text-white py-2 rounded">Save Cart to
+                Server</button>
+            <p id="saveMsg" class="mt-2 text-sm"></p>
+        </div>
+
+        <!-- Modal -->
+        
+        <div id="modal" class="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center hidden z-50">
+            <div class="bg-white max-w-4xl w-full max-h-screen overflow-y-auto m-4 rounded-lg shadow-2xl">
+                <button id="closeModal"
+                    class="absolute top-2 right-2 text-2xl bg-white rounded-full w-8 h-8 z-10">&times;</button>
+
+                <!-- Carousel container -->
+                <div class="relative bg-gray-100">
+                    <div id="carouselTrack" class="flex transition-transform duration-300 ease-in-out"></div>
+                    <button class="absolute left-2 top-1/2 -translate-y-1/2 bg-white/80 rounded-full w-10 h-10 flex items-center justify-center shadow z-10" id="prevBtn">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+                      </button>
+                      <button class="absolute right-2 top-1/2 -translate-y-1/2 bg-white/80 rounded-full w-10 h-10 flex items-center justify-center shadow z-10" id="nextBtn">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+                      </button>
+                    <!-- Dots -->
+                    <div id="carouselDots" class="flex justify-center gap-2 mt-3"></div>
+                </div>
+
+                <!-- Details -->
+                <div class="p-4 border-t">
+                    <h2 id="modalTitle" class="text-xl font-bold mb-2"></h2>
+                    <div id="modalDesc" class="text-sm mb-4"></div>
+                    <button id="addToCartBtn" class="bg-indigo-600 text-white w-full py-2 rounded">Add to Cart</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://unpkg.com/papaparse@5.4.1/papaparse.min.js"></script>
+    <script src="app.js"></script>
 </body>
+
 </html>
