@@ -60,6 +60,7 @@ async function init() {
       if (parsed.errors.length > 0) {
         console.error("CSV PARSE ERRORS:", parsed.errors);
       }
+
       const map = new Map();
       parsed.data.forEach(row => {
         const uuid = row.UUID;
@@ -68,8 +69,22 @@ async function init() {
         const photos = (row.Photos || '').trim().split(/\s+/).filter(Boolean);
         if (photos.length) map.get(uuid).Photos.push(...photos);
       });
-      allItems = Array.from(map.values()).filter(i => i.Photos && i.Photos.length > 0);
-      console.log("FINAL ITEMS COUNT:", allItems.length);
+
+      // TEMP FIX: Show all items
+      allItems = Array.from(map.values());
+      console.log("ALL ITEMS LOADED:", allItems.length);
+      console.log("SAMPLE PHOTOS:", allItems[0]?.Photos);
+
+      // Load status
+      try {
+        const statusResp = await fetch('data/status.json');
+        const statusData = await statusResp.json();
+        allItems.forEach(item => {
+          item.Status = statusData[item.UUID] || 'Attivo';
+        });
+      } catch (e) {
+        allItems.forEach(item => item.Status = 'Attivo');
+      }
     } catch (e) {
       console.error("FATAL CSV ERROR:", e);
       allItems = [];
@@ -85,7 +100,9 @@ async function init() {
   function filterItems() {
     const q = (document.getElementById('search').value || '').toLowerCase().trim();
     const locFilter = document.getElementById('catFilter').value;
-    //const statusFilter = document.getElementById('statusFilter')?.value || '';
+    const statusFilterEl = document.getElementById('statusFilter');
+    const statusFilter = statusFilterEl ? statusFilterEl.value : '';
+
     return allItems.filter(item => {
       const searchText = (item.Item + ' ' + (item.Location || '') + ' ' + (item.Categories || '') + ' ' + (item.Notes || '')).toLowerCase();
       const matchSearch = !q || searchText.includes(q);
@@ -117,6 +134,10 @@ async function init() {
     });
 
     const statusSel = document.createElement('select');
+    statusSel.addEventListener('change', () => {
+      displayed = 0;
+      renderGrid();
+    });
     statusSel.id = 'statusFilter';
     statusSel.className = 'ml-2 p-2 border rounded';
     statusSel.innerHTML = `

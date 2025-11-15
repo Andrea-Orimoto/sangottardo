@@ -71,6 +71,12 @@
             <select id="catFilter" class="p-2 border rounded">
                 <option value="">All Categories</option>
             </select>
+            <select id="statusFilter" class="p-2 border rounded ml-2">
+                <option value="">All Status</option>
+                <option value="Attivo">Attivo</option>
+                <option value="Venduto">Venduto</option>
+                <option value="Prenotato">Prenotato</option>
+            </select>
             <button id="clearFilters" class="bg-gray-300 px-3 py-2 rounded">Clear</button>
         </div>
 
@@ -121,7 +127,7 @@
         <script src="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.js"></script>
     </div>
 
-    <script src="https://unpkg.com/papaparse@5.4.1/papaparse.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
     <script src="app.js?6"></script>
     <script>
         // === GLOBAL FUNCTIONS FOR GOOGLE SDK ===
