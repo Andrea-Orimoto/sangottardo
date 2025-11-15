@@ -143,23 +143,31 @@ function openModal(item) {
   dotsContainer.innerHTML = '';
 
   item.Photos.forEach((src, idx) => {
-    console.log(`[DEBUG] Adding slide ${idx}: ${src}`);
+    console.log(`[SLIDE ${idx}] Creating: ${src}`);
   
     const slide = document.createElement('div');
-    slide.style.cssText = 'flex: 0 0 100%; width: 100%; display: flex; align-items: center; justify-content: center; min-height: 60vh; background: #f9fafb;';
+    slide.style.cssText = `
+      min-width: 100%;
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 100%;
+      padding: 0 1rem;
+      box-sizing: border-box;
+      background: #f9fafb;
+    `;
   
     const img = document.createElement('img');
     img.src = `images/${src}`;
     img.alt = `${item.Item} - ${idx + 1}`;
-    img.style.cssText = 'max-width: 95%; max-height: 95%; object-fit: contain; display: block; opacity: 1;';
-    
+    img.style.cssText = 'max-width:100%; max-height:100%; object-fit:contain; display:block;';
+  
     img.onerror = () => {
-      console.error(`[ERROR] Failed to load: ${src}`);
+      console.error(`[ERROR] ${src} failed`);
       img.src = 'images/placeholder.jpg';
     };
-    img.onload = () => {
-      console.log(`[SUCCESS] Loaded: ${src}`);
-    };
+    img.onload = () => console.log(`[LOADED] ${src}`);
   
     slide.appendChild(img);
     track.appendChild(slide);
@@ -168,7 +176,10 @@ function openModal(item) {
     const dot = document.createElement('div');
     dot.className = 'carousel-dot';
     dot.dataset.index = idx;
-    dot.onclick = () => goToSlide(idx);
+    dot.onclick = (e) => {
+      e.stopPropagation();
+      goToSlide(idx);
+    };
     dotsContainer.appendChild(dot);
   });
 
@@ -203,7 +214,7 @@ function updateCarousel() {
   const track = document.getElementById('carouselTrack');
   const offset = currentSlide * 100;
   track.style.transform = `translateX(-${offset}%)`;
-  console.log(`[TRANSFORM] Slide ${currentSlide} → translateX(-${offset}%)`);
+  console.log(`[CAROUSEL] → Slide ${currentSlide}`);
   updateDots();
 }
 
@@ -222,42 +233,31 @@ function setupCarouselControls(totalSlides) {
   let isDown = false;
 
   // Arrows
-  if (prevBtn) prevBtn.onclick = (e) => { e.stopPropagation(); goToSlide(currentSlide - 1); };
-  if (nextBtn) nextBtn.onclick = (e) => { e.stopPropagation(); goToSlide(currentSlide + 1); };
+  prevBtn.onclick = (e) => { e.stopPropagation(); goToSlide(currentSlide - 1); };
+  nextBtn.onclick = (e) => { e.stopPropagation(); goToSlide(currentSlide + 1); };
 
-  // Touch (mobile swipe) - better reset
+  // Touch
   track.addEventListener('touchstart', (e) => {
-    if (!isDown) {  // Only start if not already swiping
-      e.stopPropagation();
-      isDown = true;
-      startX = e.touches[0].clientX;
-    }
+    e.stopPropagation();
+    isDown = true;
+    startX = e.touches[0].clientX;
   }, { passive: false });
 
   track.addEventListener('touchmove', (e) => {
     if (!isDown) return;
     e.stopPropagation();
-    const x = e.touches[0].clientX;
-    const diff = startX - x;
+    e.preventDefault();  // ← BLOCKS PAGE SCROLL
+    const diff = startX - e.touches[0].clientX;
     if (Math.abs(diff) > 50) {
       goToSlide(currentSlide + (diff > 0 ? 1 : -1));
-      isDown = false;  // ← CRITICAL: Reset immediately after slide
-      startX = 0;
+      isDown = false;
     }
   }, { passive: false });
 
   track.addEventListener('touchend', (e) => {
     e.stopPropagation();
-    isDown = false;  // Always reset on end
-    startX = 0;
-  }, { passive: false });
-
-  // Mouse wheel (desktop)
-  track.addEventListener('wheel', (e) => {
-    e.stopPropagation();
-    e.preventDefault();
-    goToSlide(currentSlide + (e.deltaY > 0 ? 1 : -1));
-  }, { passive: false });
+    isDown = false;
+  });
 }
 
 // === CART ===
