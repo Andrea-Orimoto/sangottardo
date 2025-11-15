@@ -1,3 +1,10 @@
+console.log("APP.JS LOADED SUCCESSFULLY");
+
+document.addEventListener('DOMContentLoaded', () => {
+  console.log("DOM READY — CALLING INIT()");
+  init();
+});
+
 // ==== CONFIG ==== 
 const REPO = 'Andrea-Orimoto/sangottardo';
 const GITHUB_TOKEN = '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';
@@ -11,8 +18,16 @@ let cart = [];
 // Use global googleUser from index.html
 
 async function init() {
+  console.log('INIT: Starting...');
   await loadCSVAndStatus();
+  console.log("INIT: Items loaded →", allItems.length);
+  if (allItems.length === 0) {
+    console.warn("NO ITEMS — CHECK CSV");
+    document.getElementById('grid').innerHTML = '<p class="text-center text-gray-500">No items found. Check data/items.csv</p>';
+    return;
+  }
   renderGrid();
+  console.log('INIT: Grid rendered');
   setupFilters();
   renderCartCount();
   document.getElementById('cartBtn').onclick = toggleCart;
@@ -25,10 +40,26 @@ async function init() {
   }
 
   async function loadCSVAndStatus() {
+    console.log("LOAD: Trying to fetch data/items.csv...");
     try {
       const resp = await fetch('data/items.csv');
+      if (!resp.ok) {
+        console.error("CSV 404! Status:", resp.status);
+        allItems = [];
+        return;
+      }
       const text = await resp.text();
+      console.log("CSV loaded! Length:", text.length, "chars");
+      if (text.trim() === '') {
+        console.error("CSV is empty!");
+        allItems = [];
+        return;
+      }
       const parsed = Papa.parse(text, { header: true, skipEmptyLines: true });
+      console.log("Papa.parse result: rows =", parsed.data.length);
+      if (parsed.errors.length > 0) {
+        console.error("CSV PARSE ERRORS:", parsed.errors);
+      }
       const map = new Map();
       parsed.data.forEach(row => {
         const uuid = row.UUID;
@@ -38,18 +69,9 @@ async function init() {
         if (photos.length) map.get(uuid).Photos.push(...photos);
       });
       allItems = Array.from(map.values()).filter(i => i.Photos && i.Photos.length > 0);
-
-      try {
-        const statusResp = await fetch('data/status.json');
-        const statusData = await statusResp.json();
-        allItems.forEach(item => {
-          item.Status = statusData[item.UUID] || 'Attivo';
-        });
-      } catch (e) {
-        allItems.forEach(item => item.Status = 'Attivo');
-      }
+      console.log("FINAL ITEMS COUNT:", allItems.length);
     } catch (e) {
-      console.error('Load error:', e);
+      console.error("FATAL CSV ERROR:", e);
       allItems = [];
     }
   }
