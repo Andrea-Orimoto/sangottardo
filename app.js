@@ -131,47 +131,16 @@ function openModal(item) {
     <strong>Price:</strong> ${formatPrice(item)}
   `;
 
-  const track = document.getElementById('carouselTrack');
-  const dotsContainer = document.getElementById('carouselDots');
-  track.innerHTML = '';
-  dotsContainer.innerHTML = '';
+  const wrapper = document.getElementById('swiperWrapper');
+  wrapper.innerHTML = '';
 
-  // === PRELOAD ALL IMAGES ===
-  const loadImage = (src) => {
-    return new Promise((resolve) => {
-      const img = new Image();
-      img.onload = () => resolve(img);
-      img.onerror = () => {
-        console.warn(`Image failed: ${src}`);
-        img.src = 'images/placeholder.jpg';
-        resolve(img);
-      };
-      img.src = `images/${src}`;
-    });
-  };
-
-  Promise.all(item.Photos.map(src => loadImage(src))).then(loadedImages => {
-    loadedImages.forEach((img, idx) => {
-      const slide = document.createElement('div');
-      slide.style.cssText = 'flex:0 0 100%; width:100%; height:100%; display:flex; align-items:center; justify-content:center; padding:0; margin:0; background:#f9fafb;';
-
-      const imgEl = document.createElement('img');
-      imgEl.src = img.src;
-      imgEl.alt = `${item.Item} - ${idx + 1}`;
-      imgEl.style.cssText = 'max-width:100%; max-height:100%; object-fit:contain; display:block;';
-
-      slide.appendChild(imgEl);
-      track.appendChild(slide);
-
-      const dot = document.createElement('div');
-      dot.className = 'carousel-dot';
-      dot.dataset.index = idx;
-      dot.onclick = (e) => { e.stopPropagation(); goToSlide(idx); };
-      dotsContainer.appendChild(dot);
-    });
-
-    currentSlide = 0;
-    updateCarousel();
+  item.Photos.forEach((src, idx) => {
+    const slide = document.createElement('div');
+    slide.className = 'swiper-slide flex items-center justify-center bg-gray-100';
+    slide.innerHTML = `
+      <img src="images/${src}" alt="${item.Item} - ${idx + 1}" class="max-w-full max-h-full object-contain" onerror="this.src='images/placeholder.jpg'">
+    `;
+    wrapper.appendChild(slide);
   });
 
   const addBtn = document.getElementById('addToCartBtn');
@@ -182,7 +151,20 @@ function openModal(item) {
 
   document.getElementById('modal').classList.remove('hidden');
   document.getElementById('closeModal').onclick = closeModal;
-  setupCarouselControls(item.Photos.length);
+
+  // Initialize Swiper
+  const swiper = new Swiper('.mySwiper', {
+    loop: false,
+    pagination: { el: '.swiper-pagination', clickable: true },
+    navigation: { nextEl: '.swiper-button-next', prevEl: '.swiper-button-prev' },
+    spaceBetween: 0,
+    slidesPerView: 1,
+    touchRatio: 1,
+    grabCursor: true,
+    on: {
+      slideChange: () => console.log('Slide changed to', swiper.activeIndex)
+    }
+  });
 }
 
 function closeModal() {
@@ -287,7 +269,7 @@ function renderCartItems() {
   }).join('');
 }
 
-window.removeFromCart = function(uuid) {
+window.removeFromCart = function (uuid) {
   cart = cart.filter(id => id !== uuid);
   localStorage.setItem('cart', JSON.stringify(cart));
   renderCartCount();
@@ -296,10 +278,12 @@ window.removeFromCart = function(uuid) {
 
 async function saveCartToGitHub() {
   if (cart.length === 0) return alert('Cart is empty');
-  const payload = { items: cart.map(uuid => {
-    const it = allItems.find(i => i.UUID === uuid);
-    return { uuid, name: it.Item, thumbnail: it.Photos[0] };
-  }), savedAt: new Date().toISOString() };
+  const payload = {
+    items: cart.map(uuid => {
+      const it = allItems.find(i => i.UUID === uuid);
+      return { uuid, name: it.Item, thumbnail: it.Photos[0] };
+    }), savedAt: new Date().toISOString()
+  };
   const filename = `carts/cart-${Date.now()}.json`;
   const content = btoa(JSON.stringify(payload, null, 2));
   try {
