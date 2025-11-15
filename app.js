@@ -34,9 +34,7 @@ async function loadCSV() {
     parsed.data.forEach(row => {
       const uuid = row.UUID;
       if (!uuid) return;
-      if (!map.has(uuid)) {
-        map.set(uuid, { ...row, Photos: [] });
-      }
+      if (!map.has(uuid)) map.set(uuid, { ...row, Photos: [] });
       const photos = (row.Photos || '').trim().split(/\s+/).filter(Boolean);
       if (photos.length) map.get(uuid).Photos.push(...photos);
     });
@@ -63,10 +61,7 @@ function renderGrid(loadMore = false) {
     div.className = 'bg-white rounded overflow-hidden shadow cursor-pointer hover:shadow-lg transition-shadow';
     div.innerHTML = `
       <div class="bg-gray-100 p-4 flex items-center justify-center rounded-t-lg">
-        <img src="images/${item.Photos[0]}" 
-             alt="${item.Item}" 
-             class="max-w-full max-h-48 w-auto h-auto object-contain transition-transform hover:scale-105"
-             onerror="this.src='images/placeholder.jpg'">
+        <img src="images/${item.Photos[0]}" alt="${item.Item}" class="max-w-full max-h-48 w-auto h-auto object-contain transition-transform hover:scale-105" onerror="this.src='images/placeholder.jpg'">
       </div>
       <div class="p-3 flex-1">
         <h3 class="font-semibold truncate">${item.Item}</h3>
@@ -85,8 +80,7 @@ function renderGrid(loadMore = false) {
 function formatPrice(item) {
   const price = item['Purchase Price'];
   const currency = item['Purchase Currency'] || 'EUR';
-  if (!price) return '—';
-  return `${price} ${currency}`;
+  return price ? `${price} ${currency}` : '—';
 }
 
 function filterItems() {
@@ -143,43 +137,22 @@ function openModal(item) {
   dotsContainer.innerHTML = '';
 
   item.Photos.forEach((src, idx) => {
-    console.log(`[SLIDE ${idx}] Creating: ${src}`);
-  
     const slide = document.createElement('div');
-    slide.style.cssText = `
-      min-width: 100%;
-      flex-shrink: 0;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      height: 100%;
-      padding: 0 1rem;
-      box-sizing: border-box;
-      background: #f9fafb;
-    `;
-  
+    slide.style.cssText = 'min-width:100%; flex-shrink:0; display:flex; align-items:center; justify-content:center; height:100%; padding:0 1rem; box-sizing:border-box; background:#f9fafb;';
+
     const img = document.createElement('img');
     img.src = `images/${src}`;
     img.alt = `${item.Item} - ${idx + 1}`;
     img.style.cssText = 'max-width:100%; max-height:100%; object-fit:contain; display:block;';
-  
-    img.onerror = () => {
-      console.error(`[ERROR] ${src} failed`);
-      img.src = 'images/placeholder.jpg';
-    };
-    img.onload = () => console.log(`[LOADED] ${src}`);
-  
+
+    img.onerror = () => { img.src = 'images/placeholder.jpg'; };
     slide.appendChild(img);
     track.appendChild(slide);
-  
-    // Dot
+
     const dot = document.createElement('div');
     dot.className = 'carousel-dot';
     dot.dataset.index = idx;
-    dot.onclick = (e) => {
-      e.stopPropagation();
-      goToSlide(idx);
-    };
+    dot.onclick = (e) => { e.stopPropagation(); goToSlide(idx); };
     dotsContainer.appendChild(dot);
   });
 
@@ -206,23 +179,18 @@ function goToSlide(index) {
   if (index < 0) index = total - 1;
   if (index >= total) index = 0;
   currentSlide = index;
-  console.log(`[NAV] Go to slide ${index}/${total - 1}`);
   updateCarousel();
 }
 
 function updateCarousel() {
   const track = document.getElementById('carouselTrack');
-  const offset = currentSlide * 100;
-  track.style.transform = `translateX(-${offset}%)`;
-  console.log(`[CAROUSEL] → Slide ${currentSlide}`);
+  track.style.transform = `translateX(-${currentSlide * 100}%)`;
   updateDots();
 }
 
 function updateDots() {
   const dots = document.querySelectorAll('#carouselDots .carousel-dot');
-  dots.forEach((dot, i) => {
-    dot.classList.toggle('active', i === currentSlide);
-  });
+  dots.forEach((dot, i) => dot.classList.toggle('active', i === currentSlide));
 }
 
 function setupCarouselControls(totalSlides) {
@@ -232,11 +200,9 @@ function setupCarouselControls(totalSlides) {
   let startX = 0;
   let isDown = false;
 
-  // Arrows
-  prevBtn.onclick = (e) => { e.stopPropagation(); goToSlide(currentSlide - 1); };
-  nextBtn.onclick = (e) => { e.stopPropagation(); goToSlide(currentSlide + 1); };
+  if (prevBtn) prevBtn.onclick = (e) => { e.stopPropagation(); goToSlide(currentSlide - 1); };
+  if (nextBtn) nextBtn.onclick = (e) => { e.stopPropagation(); goToSlide(currentSlide + 1); };
 
-  // Touch
   track.addEventListener('touchstart', (e) => {
     e.stopPropagation();
     isDown = true;
@@ -246,7 +212,7 @@ function setupCarouselControls(totalSlides) {
   track.addEventListener('touchmove', (e) => {
     if (!isDown) return;
     e.stopPropagation();
-    e.preventDefault();  // ← BLOCKS PAGE SCROLL
+    e.preventDefault();
     const diff = startX - e.touches[0].clientX;
     if (Math.abs(diff) > 50) {
       goToSlide(currentSlide + (diff > 0 ? 1 : -1));
@@ -267,7 +233,6 @@ function addToCart(uuid) {
     localStorage.setItem('cart', JSON.stringify(cart));
     renderCartCount();
     renderCartItems();
-    alert(`Added to cart!`);
   }
 }
 
