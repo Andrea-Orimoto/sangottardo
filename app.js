@@ -7,20 +7,8 @@ const ADMIN_PASSWORD_HASH = '6972cf16a98ceb52957e425cdf7dc642eca2e97cc1aef848f53
 const PAGE_SIZE = 12;
 let allItems = [], displayed = 0;
 let cart = [];
-let googleUser = null;
 
-document.addEventListener('DOMContentLoaded', init);
-
-function renderGoogleButton() {
-  gapi.load('signin2', () => {
-    gapi.signin2.render('googleSignIn', {
-      scope: 'profile email https://www.googleapis.com/auth/drive.appdata',
-      width: 200, height: 40, longtitle: true, theme: 'dark',
-      onsuccess: onGoogleSignIn,
-      onfailure: () => console.log('Google login failed')
-    });
-  });
-}
+// Use global googleUser from index.html
 
 async function init() {
   await loadCSVAndStatus();
@@ -115,8 +103,8 @@ async function init() {
     <option value="Venduto">Venduto</option>
     <option value="Prenotato">Prenotato</option>
   `;
-  const filtersDiv = document.querySelector('#filters');
-  if (filtersDiv) filtersDiv.appendChild(statusSel);
+    const filtersDiv = document.querySelector('#filters');
+    if (filtersDiv) filtersDiv.appendChild(statusSel);
 
     let timeout;
     document.getElementById('search').addEventListener('input', (e) => {
@@ -268,14 +256,6 @@ async function init() {
   }
 
   // Google Login
-  function onGoogleSignIn(googleUserProfile) {
-    googleUser = googleUserProfile;
-    const profile = googleUser.getBasicProfile();
-    document.getElementById('userInfo').innerHTML = `Hi, ${profile.getName()}`;
-    document.getElementById('userInfo').classList.remove('hidden');
-    document.getElementById('googleSignIn').classList.add('hidden');
-    loadCartFromDrive();
-  }
 
   function signOut() {
     gapi.auth2.getAuthInstance().signOut().then(() => {
@@ -287,8 +267,8 @@ async function init() {
 
   // Cart: Google Drive
   async function saveCartToDrive() {
-    if (!googleUser) return;
-    const accessToken = googleUser.getAuthResponse().access_token;
+    if (!window.googleUser) return;
+    const accessToken = window.googleUser.getAuthResponse().access_token;
     const fileContent = JSON.stringify({ items: cart, savedAt: new Date().toISOString() });
     const fileName = 'sangottardo-cart.json';
     let fileId = null;
@@ -306,8 +286,8 @@ async function init() {
   }
 
   async function loadCartFromDrive() {
-    if (!googleUser) return;
-    const accessToken = googleUser.getAuthResponse().access_token;
+    if (!window.googleUser) return;
+    const accessToken = window.googleUser.getAuthResponse().access_token;
     try {
       const res = await fetch(`https://www.googleapis.com/drive/v3/files?q=name='sangottardo-cart.json' and trashed=false`, { headers: { Authorization: `Bearer ${accessToken}` } });
       const data = await res.json();
