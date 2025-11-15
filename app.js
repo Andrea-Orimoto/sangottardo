@@ -143,20 +143,24 @@ function openModal(item) {
   dotsContainer.innerHTML = '';
 
   item.Photos.forEach((src, idx) => {
-    // Slide wrapper (explicit 100% width)
+    console.log(`Creating slide ${idx}: ${src}`);  // Debug: Confirm creation
+  
     const slide = document.createElement('div');
-    slide.className = 'w-full flex items-center justify-center bg-gray-100 min-h-[60vh]';  // Full width + height
-    
+    slide.className = 'flex items-center justify-center bg-gray-100';
+    slide.style.width = '100vw';  // Force full width inline
+    slide.style.flex = '0 0 100vw';  // No shrink
+  
     const img = document.createElement('img');
     img.src = `images/${src}`;
     img.alt = `${item.Item} - ${idx + 1}`;
-    img.className = 'max-w-full max-h-full object-contain';  // Fit to container
-    img.style.opacity = '0';  // Start hidden
+    img.className = 'max-w-full max-h-full object-contain';
     img.onerror = () => { 
+      console.error(`Image load failed: images/${src}`);  // Debug error
       img.src = 'images/placeholder.jpg'; 
-      img.style.opacity = '1'; 
     };
-    img.onload = () => { img.style.opacity = '1'; };  // Fade in when loaded
+    img.onload = () => { 
+      console.log(`Image ${idx} loaded: ${src}`);  // Debug success
+    };
   
     slide.appendChild(img);
     track.appendChild(slide);
@@ -192,12 +196,15 @@ function goToSlide(index) {
   if (index < 0) index = total - 1;
   if (index >= total) index = 0;
   currentSlide = index;
+  console.log(`Switched to slide ${index}`);  // Debug slide change
   updateCarousel();
 }
 
 function updateCarousel() {
   const track = document.getElementById('carouselTrack');
-  track.style.transform = `translateX(-${currentSlide * 100}%)`;
+  const offset = currentSlide * 100;
+  track.style.transform = `translateX(-${offset}vw)`;  // Use vw for exact slide width
+  console.log(`Transform: translateX(-${offset}vw)`);  // Debug transform
   updateDots();
 }
 
