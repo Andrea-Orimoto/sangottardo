@@ -240,26 +240,37 @@ function setupCarouselControls(totalSlides) {
     const track = document.getElementById('carouselTrack');
     let startX = 0;
     let isDown = false;
-
+  
+    // === TOUCH: Only on carousel track ===
     track.addEventListener('touchstart', e => {
-        isDown = true;
-        startX = e.touches[0].clientX;
-    });
+      e.stopPropagation(); // ← PREVENT MODAL SWIPE
+      isDown = true;
+      startX = e.touches[0].clientX;
+    }, { passive: true });
+  
     track.addEventListener('touchmove', e => {
-        if (!isDown) return;
-        const diff = startX - e.touches[0].clientX;
-        if (Math.abs(diff) > 50) {
-            goToSlide(currentSlide + (diff > 0 ? 1 : -1));
-            isDown = false;
-        }
-    });
-    track.addEventListener('touchend', () => isDown = false);
-
+      if (!isDown) return;
+      e.stopPropagation(); // ← CRITICAL
+      const x = e.touches[0].clientX;
+      const diff = startX - x;
+      if (Math.abs(diff) > 50) {
+        goToSlide(currentSlide + (diff > 0 ? 1 : -1));
+        isDown = false;
+      }
+    }, { passive: true });
+  
+    track.addEventListener('touchend', e => {
+      e.stopPropagation();
+      isDown = false;
+    }, { passive: true });
+  
+    // === MOUSE WHEEL: Only on track ===
     track.addEventListener('wheel', e => {
-        e.preventDefault();
-        goToSlide(currentSlide + (e.deltaY > 0 ? 1 : -1));
-    });
-}
+      e.stopPropagation();
+      e.preventDefault();
+      goToSlide(currentSlide + (e.deltaY > 0 ? 1 : -1));
+    }, { passive: false });
+  }
 
 // Close modal
 function closeModal() {

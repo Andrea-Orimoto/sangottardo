@@ -65,3 +65,12 @@
 .carousel-dot.active {
     background: #4f46e5;
 }
+
+/* Prevent modal from being dragged */
+#modal * {
+    -webkit-user-select: none;
+    user-select: none;
+  }
+  #carouselTrack {
+    touch-action: pan-x; /* Allow horizontal swipe only */
+  }
