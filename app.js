@@ -138,7 +138,18 @@ function openModal(item) {
 
   item.Photos.forEach((src, idx) => {
     const slide = document.createElement('div');
-    slide.style.cssText = 'flex:0 0 100%; width:100%; display:flex; align-items:center; justify-content:center; height:100%; padding:0; margin:0; background:#f9fafb; box-sizing:border-box;';
+    slide.style.cssText = `
+      flex:0 0 100%; 
+      width:100%; 
+      min-height:100%; 
+      display:flex; 
+      align-items:center; 
+      justify-content:center; 
+      padding:0; 
+      margin:0; 
+      background:#f9fafb; 
+      box-sizing:border-box;
+    `;
   
     const img = document.createElement('img');
     img.src = `images/${src}`;
