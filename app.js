@@ -1,4 +1,4 @@
-// ==== CONFIG ==== (edit these!)
+// ==== CONFIG ==== 
 const REPO = 'Andrea-Orimoto/sangottardo';
 const GITHUB_TOKEN = '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';
 const ADMIN_PASSWORD_HASH = '6972cf16a98ceb52957e425cdf7dc642eca2e97cc1aef848f530509894362d32'; // default "password"
@@ -136,28 +136,43 @@ function openModal(item) {
   track.innerHTML = '';
   dotsContainer.innerHTML = '';
 
-  item.Photos.forEach((src, idx) => {
-    const slide = document.createElement('div');
-    slide.style.cssText = 'flex:0 0 100%; width:100%; height:100%; display:flex; align-items:center; justify-content:center; padding:0; margin:0; background:#f9fafb; box-sizing:border-box;';
+  // === PRELOAD ALL IMAGES ===
+  const loadImage = (src) => {
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.onload = () => resolve(img);
+      img.onerror = () => {
+        console.warn(`Image failed: ${src}`);
+        img.src = 'images/placeholder.jpg';
+        resolve(img);
+      };
+      img.src = `images/${src}`;
+    });
+  };
 
-    const img = document.createElement('img');
-    img.src = `images/${src}`;
-    img.alt = `${item.Item} - ${idx + 1}`;
-    img.style.cssText = 'max-width:100%; max-height:100%; object-fit:contain; display:block;';
+  Promise.all(item.Photos.map(src => loadImage(src))).then(loadedImages => {
+    loadedImages.forEach((img, idx) => {
+      const slide = document.createElement('div');
+      slide.style.cssText = 'flex:0 0 100%; width:100%; height:100%; display:flex; align-items:center; justify-content:center; padding:0; margin:0; background:#f9fafb;';
 
-    img.onerror = () => { img.src = 'images/placeholder.jpg'; };
-    slide.appendChild(img);
-    track.appendChild(slide);
+      const imgEl = document.createElement('img');
+      imgEl.src = img.src;
+      imgEl.alt = `${item.Item} - ${idx + 1}`;
+      imgEl.style.cssText = 'max-width:100%; max-height:100%; object-fit:contain; display:block;';
 
-    const dot = document.createElement('div');
-    dot.className = 'carousel-dot';
-    dot.dataset.index = idx;
-    dot.onclick = (e) => { e.stopPropagation(); goToSlide(idx); };
-    dotsContainer.appendChild(dot);
+      slide.appendChild(imgEl);
+      track.appendChild(slide);
+
+      const dot = document.createElement('div');
+      dot.className = 'carousel-dot';
+      dot.dataset.index = idx;
+      dot.onclick = (e) => { e.stopPropagation(); goToSlide(idx); };
+      dotsContainer.appendChild(dot);
+    });
+
+    currentSlide = 0;
+    updateCarousel();
   });
-
-  currentSlide = 0;
-  updateCarousel();
 
   const addBtn = document.getElementById('addToCartBtn');
   const inCart = cart.includes(item.UUID);
@@ -185,6 +200,7 @@ function goToSlide(index) {
 function updateCarousel() {
   const track = document.getElementById('carouselTrack');
   track.style.transform = `translateX(-${currentSlide * 100}%)`;
+  void track.offsetHeight;  // FORCE REPAINT
   updateDots();
 }
 
@@ -204,26 +220,25 @@ function setupCarouselControls(totalSlides) {
   if (nextBtn) nextBtn.onclick = (e) => { e.stopPropagation(); goToSlide(currentSlide + 1); };
 
   track.addEventListener('touchstart', (e) => {
-    e.stopPropagation();
     isDown = true;
     startX = e.touches[0].clientX;
-  }, { passive: false });
+  }, { passive: true });
 
   track.addEventListener('touchmove', (e) => {
     if (!isDown) return;
-    e.stopPropagation();
-    e.preventDefault();
     const diff = startX - e.touches[0].clientX;
     if (Math.abs(diff) > 50) {
       goToSlide(currentSlide + (diff > 0 ? 1 : -1));
       isDown = false;
     }
-  }, { passive: false });
+  }, { passive: true });
 
-  track.addEventListener('touchend', (e) => {
-    e.stopPropagation();
-    isDown = false;
-  });
+  track.addEventListener('touchend', () => { isDown = false; }, { passive: true });
+
+  track.addEventListener('wheel', (e) => {
+    e.preventDefault();
+    goToSlide(currentSlide + (e.deltaY > 0 ? 1 : -1));
+  }, { passive: false });
 }
 
 // === CART ===
