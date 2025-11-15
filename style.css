@@ -35,34 +35,42 @@
 
 /* Carousel */
 /* MODAL CAROUSEL – FIXED HEIGHT */
+/* === MODAL CAROUSEL — FINAL, BULLETPROOF === */
 #carouselTrack {
     height: 60vh;
     max-height: 500px;
     display: flex;
     transition: transform 0.3s ease-in-out;
     overflow: hidden;
-    width: 100vw;  /* Full viewport width */
-    position: relative;  /* For transform */
+    width: 100%;           /* Full modal width */
+    margin: 0;
+    padding: 0;
+    position: relative;
+    background: #f9fafb;
   }
   
-  #carouselTrack > div {  /* Each slide */
-    flex: 0 0 100vw;  /* No grow/shrink, exact viewport width */
+  #carouselTrack > div {
+    flex: 0 0 100%;        /* Exact 100% of track width */
+    width: 100%;
     display: flex;
     align-items: center;
     justify-content: center;
+    min-height: 60vh;
+    background: #f9fafb;
+    box-sizing: border-box;
     padding: 0;
     margin: 0;
-    min-height: 60vh;
-    background: #f9fafb;  /* Light bg for blank test */
-    box-sizing: border-box;
   }
   
   #carouselTrack img {
-    max-width: 100%;
-    max-height: 100%;
+    max-width: 95%;
+    max-height: 95%;
     object-fit: contain;
     object-position: center;
+    display: block;
+    opacity: 1 !important;
     border: none;
+    box-shadow: none;
   }
   
   /* Dots */
@@ -78,7 +86,7 @@
     background: #4f46e5;
   }
   
-  /* Prevent modal drag */
+  /* Prevent any modal drag */
   #modal {
     touch-action: none;
   }

@@ -143,23 +143,22 @@ function openModal(item) {
   dotsContainer.innerHTML = '';
 
   item.Photos.forEach((src, idx) => {
-    console.log(`Creating slide ${idx}: ${src}`);  // Debug: Confirm creation
+    console.log(`[DEBUG] Adding slide ${idx}: ${src}`);
   
     const slide = document.createElement('div');
-    slide.className = 'flex items-center justify-center bg-gray-100';
-    slide.style.width = '100vw';  // Force full width inline
-    slide.style.flex = '0 0 100vw';  // No shrink
+    slide.style.cssText = 'flex: 0 0 100%; width: 100%; display: flex; align-items: center; justify-content: center; min-height: 60vh; background: #f9fafb;';
   
     const img = document.createElement('img');
     img.src = `images/${src}`;
     img.alt = `${item.Item} - ${idx + 1}`;
-    img.className = 'max-w-full max-h-full object-contain';
-    img.onerror = () => { 
-      console.error(`Image load failed: images/${src}`);  // Debug error
-      img.src = 'images/placeholder.jpg'; 
+    img.style.cssText = 'max-width: 95%; max-height: 95%; object-fit: contain; display: block; opacity: 1;';
+    
+    img.onerror = () => {
+      console.error(`[ERROR] Failed to load: ${src}`);
+      img.src = 'images/placeholder.jpg';
     };
-    img.onload = () => { 
-      console.log(`Image ${idx} loaded: ${src}`);  // Debug success
+    img.onload = () => {
+      console.log(`[SUCCESS] Loaded: ${src}`);
     };
   
     slide.appendChild(img);
@@ -196,15 +195,15 @@ function goToSlide(index) {
   if (index < 0) index = total - 1;
   if (index >= total) index = 0;
   currentSlide = index;
-  console.log(`Switched to slide ${index}`);  // Debug slide change
+  console.log(`[NAV] Go to slide ${index}/${total - 1}`);
   updateCarousel();
 }
 
 function updateCarousel() {
   const track = document.getElementById('carouselTrack');
   const offset = currentSlide * 100;
-  track.style.transform = `translateX(-${offset}vw)`;  // Use vw for exact slide width
-  console.log(`Transform: translateX(-${offset}vw)`);  // Debug transform
+  track.style.transform = `translateX(-${offset}%)`;
+  console.log(`[TRANSFORM] Slide ${currentSlide} → translateX(-${offset}%)`);
   updateDots();
 }
 
