@@ -11,21 +11,9 @@
     <!-- Google Sign-In SDK -->
     <meta name="google-signin-client_id"
         content="1049409960184-lt0jqecoman6nmnfgc94ntss04vemur2.apps.googleusercontent.com">
-    <script>
-        function renderGoogleButton() {
-            if (!window.gapi) return setTimeout(renderGoogleButton, 100);
-            gapi.load('signin2', () => {
-                gapi.signin2.render('googleSignIn', {
-                    scope: 'profile email https://www.googleapis.com/auth/drive.appdata',
-                    width: 200, height: 40, longtitle: true, theme: 'dark',
-                    onsuccess: onGoogleSignIn,
-                    onfailure: () => console.log('Google login failed')
-                });
-            });
-        }
-    </script>
-    <script src="https://apis.google.com/js/platform.js?onload=renderGoogleButton" async defer></script>
-    <script src="https://apis.google.com/js/api.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.js"></script>
+
     <script>
         function renderGoogleButton() {
             if (!window.gapi) {
@@ -66,18 +54,11 @@
         </header>
 
         <!-- Filters -->
-        <div class="mb-6 flex flex-wrap gap-2">
-            <input type="text" id="search" placeholder="Search…" class="p-2 border rounded flex-1 min-w-[200px]">
-            <select id="catFilter" class="p-2 border rounded">
-                <option value="">All Categories</option>
-            </select>
-            <select id="statusFilter" class="p-2 border rounded ml-2">
-                <option value="">All Status</option>
-                <option value="Attivo">Attivo</option>
-                <option value="Venduto">Venduto</option>
-                <option value="Prenotato">Prenotato</option>
-            </select>
-            <button id="clearFilters" class="bg-gray-300 px-3 py-2 rounded">Clear</button>
+        <div id="filters" class="mb-6 flex flex-wrap gap-2 items-center">
+            <input type="text" id="search" placeholder="Search items..."
+                class="p-2 border rounded flex-1 min-w-[200px]">
+            <select id="catFilter" class="p-2 border rounded"></select>
+            <button id="clearFilters" class="bg-gray-300 px-3 py-2 rounded text-sm">Clear</button>
         </div>
 
         <!-- GRID CONTAINER -->
@@ -124,11 +105,8 @@
             </div>
         </div>
 
-        <script src="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.js"></script>
     </div>
 
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
-    <script src="app.js?6"></script>
     <script>
         // === GLOBAL FUNCTIONS FOR GOOGLE SDK ===
         let googleUser = null;
@@ -174,6 +152,23 @@
 
     <script>
         console.log("APP.JS TEST: This should appear");
+    </script>
+    <script>
+        // Read URL params on load
+        document.addEventListener('DOMContentLoaded', () => {
+            const urlParams = new URLSearchParams(window.location.search);
+            const cat = urlParams.get('cat');
+            if (cat) {
+                const catFilter = document.getElementById('catFilter');
+                if (catFilter) {
+                    // Wait for options to load
+                    setTimeout(() => {
+                        catFilter.value = cat;
+                        catFilter.dispatchEvent(new Event('change'));
+                    }, 500);
+                }
+            }
+        });
     </script>
     <script src="app.js"></script>
 </body>

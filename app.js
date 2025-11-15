@@ -115,17 +115,20 @@ async function init() {
   function setupFilters() {
     const sel = document.getElementById('catFilter');
     sel.innerHTML = '<option value="">All Categories</option>';
+
     const locations = [...new Set(allItems.map(i => i.Location).filter(Boolean))].sort();
     const locationCount = {};
     allItems.forEach(item => {
       const loc = item.Location || 'Uncategorized';
       locationCount[loc] = (locationCount[loc] || 0) + 1;
     });
+
     const totalItems = allItems.length;
     const allOption = document.createElement('option');
     allOption.value = '';
     allOption.textContent = `All Categories (${totalItems})`;
     sel.appendChild(allOption);
+
     locations.forEach(loc => {
       const opt = document.createElement('option');
       opt.value = loc;
@@ -133,11 +136,8 @@ async function init() {
       sel.appendChild(opt);
     });
 
+    // Status filter
     const statusSel = document.createElement('select');
-    statusSel.addEventListener('change', () => {
-      displayed = 0;
-      renderGrid();
-    });
     statusSel.id = 'statusFilter';
     statusSel.className = 'ml-2 p-2 border rounded';
     statusSel.innerHTML = `
@@ -146,16 +146,36 @@ async function init() {
     <option value="Venduto">Venduto</option>
     <option value="Prenotato">Prenotato</option>
   `;
-    const filtersDiv = document.querySelector('#filters');
-    if (filtersDiv) filtersDiv.appendChild(statusSel);
 
+    // SAFE APPEND
+    const filtersDiv = document.querySelector('#filters');
+    if (filtersDiv) {
+      filtersDiv.appendChild(statusSel);
+    }
+
+    // Search debounce
     let timeout;
-    document.getElementById('search').addEventListener('input', (e) => {
+    document.getElementById('search').addEventListener('input', () => {
       clearTimeout(timeout);
       timeout = setTimeout(() => { displayed = 0; renderGrid(); }, 300);
     });
-    document.getElementById('catFilter').addEventListener('change', () => { displayed = 0; renderGrid(); });
+
+    // Filter changes
+    sel.addEventListener('change', () => { displayed = 0; renderGrid(); });
     statusSel.addEventListener('change', () => { displayed = 0; renderGrid(); });
+
+    // URL ?cat= support
+    const urlParams = new URLSearchParams(window.location.search);
+    const urlCat = urlParams.get('cat');
+    if (urlCat) {
+      setTimeout(() => {
+        const option = sel.querySelector(`option[value="${urlCat}"]`);
+        if (option) {
+          sel.value = urlCat;
+          sel.dispatchEvent(new Event('change'));
+        }
+      }, 100);
+    }
   }
 
   function clearFilters() {
