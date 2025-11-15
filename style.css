@@ -155,3 +155,9 @@
 .swiper-pagination-bullet-active {
     background: #6366f1 !important;
 }
+
+/* Photo count badge — subtle & premium */
+.grid-photo-badge {
+    font-family: system-ui, -apple-system, sans-serif;
+    font-weight: 600;
+  }

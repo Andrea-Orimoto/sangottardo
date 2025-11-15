@@ -60,15 +60,21 @@ function renderGrid(loadMore = false) {
     const div = document.createElement('div');
     div.className = 'bg-white rounded overflow-hidden shadow cursor-pointer hover:shadow-lg transition-shadow';
     div.innerHTML = `
-      <div class="bg-gray-100 p-4 flex items-center justify-center rounded-t-lg">
-        <img src="images/${item.Photos[0]}" alt="${item.Item}" class="max-w-full max-h-48 w-auto h-auto object-contain transition-transform hover:scale-105" onerror="this.src='images/placeholder.jpg'">
-      </div>
-      <div class="p-3 flex-1">
-        <h3 class="font-semibold truncate">${item.Item}</h3>
-        <p class="text-sm text-gray-600">Category: ${item.Location || '—'}</p>
-        <p class="text-xs text-gray-500 mt-1">Serial: ${item['Serial No'] || '—'}</p>
-        <p class="text-sm font-medium text-indigo-600 mt-2">Price: ${formatPrice(item)}</p>
-      </div>`;
+    <div class="bg-gray-100 p-4 flex items-center justify-center rounded-t-lg relative">
+      <img src="images/${item.Photos[0]}" alt="${item.Item}" class="max-w-full max-h-48 w-auto h-auto object-contain transition-transform hover:scale-105" onerror="this.src='images/placeholder.jpg'">
+      ${item.Photos.length > 1 ? `
+        <div class="absolute bottom-2 right-2 bg-black bg-opacity-70 text-white text-xs px-2 py-1 rounded-full flex items-center gap-1">
+          <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+          <span>${item.Photos.length}</span>
+        </div>
+      ` : ''}
+    </div>
+    <div class="p-3 flex-1">
+      <h3 class="font-semibold truncate">${item.Item}</h3>
+      <p class="text-sm text-gray-600">Category: ${item.Location || '—'}</p>
+      <p class="text-xs text-gray-500 mt-1">Serial: ${item['Serial No'] || '—'}</p>
+      <p class="text-sm font-medium text-indigo-600 mt-2">Price: ${formatPrice(item)}</p>
+    </div>`;
     div.onclick = () => openModal(item);
     fragment.appendChild(div);
   }
