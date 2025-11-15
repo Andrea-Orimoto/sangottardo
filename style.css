@@ -40,6 +40,7 @@
     max-height: 500px;
     display: flex;
     transition: transform 0.3s ease-in-out;
+    overflow: hidden;
 }
 
 
@@ -70,6 +71,7 @@
 #modal * {
     -webkit-user-select: none;
     user-select: none;
+    touch-action: none;
   }
   #carouselTrack {
     touch-action: pan-x; /* Allow horizontal swipe only */

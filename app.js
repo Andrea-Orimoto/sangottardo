@@ -201,34 +201,43 @@ function updateDots() {
 
 function setupCarouselControls(totalSlides) {
   const track = document.getElementById('carouselTrack');
+  const prevBtn = document.getElementById('prevBtn');
+  const nextBtn = document.getElementById('nextBtn');
   let startX = 0;
   let isDown = false;
 
-  track.addEventListener('touchstart', e => {
+  // Arrows
+  if (prevBtn) prevBtn.onclick = (e) => { e.stopPropagation(); goToSlide(currentSlide - 1); };
+  if (nextBtn) nextBtn.onclick = (e) => { e.stopPropagation(); goToSlide(currentSlide + 1); };
+
+  // Touch (mobile swipe)
+  track.addEventListener('touchstart', (e) => {
     e.stopPropagation();
     isDown = true;
     startX = e.touches[0].clientX;
-  }, { passive: true });
+  }, { passive: false });  // ← Changed to false for stopPropagation
 
-  track.addEventListener('touchmove', e => {
+  track.addEventListener('touchmove', (e) => {
     if (!isDown) return;
     e.stopPropagation();
-    const diff = startX - e.touches[0].clientX;
+    const x = e.touches[0].clientX;
+    const diff = startX - x;
     if (Math.abs(diff) > 50) {
       goToSlide(currentSlide + (diff > 0 ? 1 : -1));
       isDown = false;
     }
-  }, { passive: true });
+  }, { passive: false });
 
-  track.addEventListener('touchend', e => {
+  track.addEventListener('touchend', (e) => {
     e.stopPropagation();
     isDown = false;
-  }, { passive: true });
+  }, { passive: false });
 
-  track.addEventListener('wheel', e => {
+  // Mouse wheel (desktop)
+  track.addEventListener('wheel', (e) => {
     e.stopPropagation();
     e.preventDefault();
-    goToSlide(currentSlide + (e.deltaY > 0 ? 1 : -1));
+    goToSlide(currentSlide + (e.deltaY > 0 ? 1 : - 1));
   }, { passive: false });
 }
 
