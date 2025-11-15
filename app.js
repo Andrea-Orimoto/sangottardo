@@ -6,28 +6,37 @@ const ADMIN_PASSWORD_HASH = '6972cf16a98ceb52957e425cdf7dc642eca2e97cc1aef848f53
 
 const PAGE_SIZE = 12;
 let allItems = [], displayed = 0;
-let cart = JSON.parse(localStorage.getItem('cart') || '[]');
-let currentSlide = 0;
+let cart = [];
+let googleUser = null;
 
 document.addEventListener('DOMContentLoaded', init);
 
+function renderGoogleButton() {
+  gapi.load('signin2', () => {
+    gapi.signin2.render('googleSignIn', {
+      scope: 'profile email https://www.googleapis.com/auth/drive.appdata',
+      width: 200, height: 40, longtitle: true, theme: 'dark',
+      onsuccess: onGoogleSignIn,
+      onfailure: () => console.log('Google login failed')
+    });
+  });
+}
+
 async function init() {
-  await loadCSV();
+  await loadCSVAndStatus();
   renderGrid();
   setupFilters();
   renderCartCount();
   document.getElementById('cartBtn').onclick = toggleCart;
   document.getElementById('closeCart').onclick = () => toggleCart(false);
-  document.getElementById('saveCartBtn').onclick = saveCartToGitHub;
   document.getElementById('loadMore').onclick = () => renderGrid(true);
   document.getElementById('clearFilters').onclick = clearFilters;
   if (localStorage.getItem('adminToken')) document.getElementById('adminLink').classList.remove('hidden');
 }
 
-async function loadCSV() {
+async function loadCSVAndStatus() {
   try {
     const resp = await fetch('data/items.csv');
-    if (!resp.ok) throw new Error('CSV fetch failed');
     const text = await resp.text();
     const parsed = Papa.parse(text, { header: true, skipEmptyLines: true });
     const map = new Map();
@@ -39,57 +48,20 @@ async function loadCSV() {
       if (photos.length) map.get(uuid).Photos.push(...photos);
     });
     allItems = Array.from(map.values()).filter(i => i.Photos && i.Photos.length > 0);
+
+    try {
+      const statusResp = await fetch('data/status.json');
+      const statusData = await statusResp.json();
+      allItems.forEach(item => {
+        item.Status = statusData[item.UUID] || 'Attivo';
+      });
+    } catch (e) {
+      allItems.forEach(item => item.Status = 'Attivo');
+    }
   } catch (e) {
-    console.error('CSV load error:', e);
+    console.error('Load error:', e);
     allItems = [];
   }
-}
-
-function renderGrid(loadMore = false) {
-  if (!loadMore) {
-    document.getElementById('grid').innerHTML = '';
-    displayed = 0;
-  }
-  const container = document.getElementById('grid');
-  const fragment = document.createDocumentFragment();
-  const filtered = filterItems();
-  const start = displayed;
-  const end = Math.min(start + PAGE_SIZE, filtered.length);
-  for (let i = start; i < end; i++) {
-    const item = filtered[i];
-    const div = document.createElement('div');
-    div.className = 'bg-white rounded overflow-hidden shadow cursor-pointer hover:shadow-lg transition-shadow';
-    div.innerHTML = `
-    <div class="bg-gray-100 flex items-center justify-center rounded-t-lg h-48 relative overflow-hidden">
-      <img 
-        src="images/${item.Photos[0]}" 
-        alt="${item.Item}" 
-        class="max-h-full max-w-full object-contain transition-transform hover:scale-105" 
-        onerror="this.src='images/placeholder.jpg'"
-      >
-      ${item.Photos.length > 1 ? `
-        <div class="absolute bottom-2 right-2 bg-black bg-opacity-70 text-white text-xs px-2 py-1 rounded-full flex items-center gap-1">
-          <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
-          <span>${item.Photos.length}</span>
-        </div>
-      ` : ''}
-    </div>
-    <div class="p-3 h-32 flex flex-col justify-between bg-white">
-      <div>
-        <h3 class="font-semibold text-sm line-clamp-2 leading-tight">${item.Item}</h3>
-        <p class="text-xs text-gray-600 mt-1">Category: ${item.Location || '—'}</p>
-        <p class="text-xs text-gray-500">Serial: ${item['Serial No'] || '—'}</p>
-      </div>
-      <p class="text-sm font-medium text-indigo-600">Price: ${formatPrice(item)}</p>
-    </div>
-  `;
-    
-    div.onclick = () => openModal(item);
-    fragment.appendChild(div);
-  }
-  container.appendChild(fragment);
-  displayed = end;
-  document.getElementById('loadMore').classList.toggle('hidden', displayed >= filtered.length);
 }
 
 function formatPrice(item) {
@@ -101,34 +73,30 @@ function formatPrice(item) {
 function filterItems() {
   const q = (document.getElementById('search').value || '').toLowerCase().trim();
   const locFilter = document.getElementById('catFilter').value;
+  const statusFilter = document.getElementById('statusFilter')?.value || '';
   return allItems.filter(item => {
     const searchText = (item.Item + ' ' + (item.Location || '') + ' ' + (item.Categories || '') + ' ' + (item.Notes || '')).toLowerCase();
     const matchSearch = !q || searchText.includes(q);
     const matchLocation = !locFilter || (item.Location || '').trim() === locFilter;
-    return matchSearch && matchLocation;
+    const matchStatus = !statusFilter || item.Status === statusFilter;
+    return matchSearch && matchLocation && matchStatus;
   });
 }
 
 function setupFilters() {
   const sel = document.getElementById('catFilter');
-  sel.innerHTML = ''; // Clear existing
-
-  // Count items per location
+  sel.innerHTML = '<option value="">All Categories</option>';
+  const locations = [...new Set(allItems.map(i => i.Location).filter(Boolean))].sort();
   const locationCount = {};
   allItems.forEach(item => {
     const loc = item.Location || 'Uncategorized';
     locationCount[loc] = (locationCount[loc] || 0) + 1;
   });
-
-  // Add "All Categories" with total count
   const totalItems = allItems.length;
   const allOption = document.createElement('option');
   allOption.value = '';
   allOption.textContent = `All Categories (${totalItems})`;
   sel.appendChild(allOption);
-
-  // Add each location with count
-  const locations = [...new Set(allItems.map(i => i.Location).filter(Boolean))].sort();
   locations.forEach(loc => {
     const opt = document.createElement('option');
     opt.value = loc;
@@ -136,155 +104,72 @@ function setupFilters() {
     sel.appendChild(opt);
   });
 
-  // Uncategorized
-  if (locationCount['Uncategorized']) {
-    const opt = document.createElement('option');
-    opt.value = '';
-    opt.textContent = `Uncategorized (${locationCount['Uncategorized']})`;
-    sel.appendChild(opt);
-  }
+  const statusSel = document.createElement('select');
+  statusSel.id = 'statusFilter';
+  statusSel.className = 'ml-2 p-2 border rounded';
+  statusSel.innerHTML = `
+    <option value="">All Status</option>
+    <option value="Attivo">Attivo</option>
+    <option value="Venduto">Venduto</option>
+    <option value="Prenotato">Prenotato</option>
+  `;
+  document.querySelector('#filters').appendChild(statusSel);
 
-  // Re-apply current filter if any
-  const currentFilter = new URLSearchParams(window.location.search).get('cat') || '';
-  if (currentFilter) sel.value = locations.includes(currentFilter) ? currentFilter : '';
-
-  // Event listeners
   let timeout;
   document.getElementById('search').addEventListener('input', (e) => {
     clearTimeout(timeout);
     timeout = setTimeout(() => { displayed = 0; renderGrid(); }, 300);
   });
-  document.getElementById('catFilter').addEventListener('change', () => {
-    displayed = 0;
-    const url = new URL(window.location);
-    const val = sel.value;
-    if (val) url.searchParams.set('cat', val);
-    else url.searchParams.delete('cat');
-    window.history.replaceState({}, '', url);
-    renderGrid();
-  });
+  document.getElementById('catFilter').addEventListener('change', () => { displayed = 0; renderGrid(); });
+  statusSel.addEventListener('change', () => { displayed = 0; renderGrid(); });
 }
 
 function clearFilters() {
   document.getElementById('search').value = '';
   document.getElementById('catFilter').value = '';
+  if (document.getElementById('statusFilter')) document.getElementById('statusFilter').value = '';
   displayed = 0;
   renderGrid();
 }
 
-// === MODAL ===
-function openModal(item) {
-  document.getElementById('modalTitle').textContent = item.Item;
-  document.getElementById('modalDesc').innerHTML = `
-    <strong>Serial Number:</strong> ${item['Serial No'] || '—'}<br>
-    <strong>Category:</strong> ${item.Location || '—'}<br>
-    <strong>Scatola:</strong> ${item.Categories || '—'}<br>
-    ${item.Notes ? `<strong>Notes:</strong><br><span class="text-sm italic text-gray-700">${item.Notes.replace(/\n/g, '<br>')}</span><br>` : ''}
-    ${item['Purchase Date'] ? `<strong>Purchased:</strong> ${item['Purchase Date']}<br>` : ''}
-    <strong>Price:</strong> ${formatPrice(item)}
-  `;
-
-  const wrapper = document.getElementById('swiperWrapper');
-  wrapper.innerHTML = '';
-
-  item.Photos.forEach((src, idx) => {
-    const slide = document.createElement('div');
-    slide.className = 'swiper-slide flex items-center justify-center bg-gray-100';
-    slide.innerHTML = `
-      <img src="images/${src}" alt="${item.Item} - ${idx + 1}" class="max-w-full max-h-full object-contain" onerror="this.src='images/placeholder.jpg'">
-    `;
-    wrapper.appendChild(slide);
-  });
-
-  const addBtn = document.getElementById('addToCartBtn');
-  const inCart = cart.includes(item.UUID);
-  addBtn.textContent = inCart ? 'Added' : 'Add to Cart';
-  addBtn.disabled = inCart;
-  addBtn.onclick = () => addToCart(item.UUID);
-
-  document.getElementById('modal').classList.remove('hidden');
-  document.getElementById('closeModal').onclick = closeModal;
-
-  // Initialize Swiper
-  const swiper = new Swiper('.mySwiper', {
-    loop: false,
-    pagination: { el: '.swiper-pagination', clickable: true },
-    navigation: { nextEl: '.swiper-button-next', prevEl: '.swiper-button-prev' },
-    spaceBetween: 0,
-    slidesPerView: 1,
-    touchRatio: 1,
-    grabCursor: true,
-    on: {
-      slideChange: () => console.log('Slide changed to', swiper.activeIndex)
-    }
-  });
-}
-
-function closeModal() {
-  document.getElementById('modal').classList.add('hidden');
-}
-
-function goToSlide(index) {
-  const total = document.getElementById('carouselTrack').children.length;
-  if (index < 0) index = total - 1;
-  if (index >= total) index = 0;
-  currentSlide = index;
-  updateCarousel();
-}
-
-function updateCarousel() {
-  const track = document.getElementById('carouselTrack');
-  track.style.transform = `translateX(-${currentSlide * 100}%)`;
-  void track.offsetHeight;  // FORCE REPAINT
-  updateDots();
-}
-
-function updateDots() {
-  const dots = document.querySelectorAll('#carouselDots .carousel-dot');
-  dots.forEach((dot, i) => dot.classList.toggle('active', i === currentSlide));
-}
-
-function setupCarouselControls(totalSlides) {
-  const track = document.getElementById('carouselTrack');
-  const prevBtn = document.getElementById('prevBtn');
-  const nextBtn = document.getElementById('nextBtn');
-  let startX = 0;
-  let isDown = false;
-
-  if (prevBtn) prevBtn.onclick = (e) => { e.stopPropagation(); goToSlide(currentSlide - 1); };
-  if (nextBtn) nextBtn.onclick = (e) => { e.stopPropagation(); goToSlide(currentSlide + 1); };
-
-  track.addEventListener('touchstart', (e) => {
-    isDown = true;
-    startX = e.touches[0].clientX;
-  }, { passive: true });
-
-  track.addEventListener('touchmove', (e) => {
-    if (!isDown) return;
-    const diff = startX - e.touches[0].clientX;
-    if (Math.abs(diff) > 50) {
-      goToSlide(currentSlide + (diff > 0 ? 1 : -1));
-      isDown = false;
-    }
-  }, { passive: true });
-
-  track.addEventListener('touchend', () => { isDown = false; }, { passive: true });
-
-  track.addEventListener('wheel', (e) => {
-    e.preventDefault();
-    goToSlide(currentSlide + (e.deltaY > 0 ? 1 : -1));
-  }, { passive: false });
-}
-
-// === CART ===
-function addToCart(uuid) {
-  if (!cart.includes(uuid)) {
-    cart.push(uuid);
-    localStorage.setItem('cart', JSON.stringify(cart));
-    renderCartCount();
-    renderCartItems();
-    alert('Added to cart!');
+function renderGrid(loadMore = false) {
+  if (!loadMore) { document.getElementById('grid').innerHTML = ''; displayed = 0; }
+  const container = document.getElementById('grid');
+  const fragment = document.createDocumentFragment();
+  const filtered = filterItems();
+  const start = displayed;
+  const end = Math.min(start + PAGE_SIZE, filtered.length);
+  for (let i = start; i < end; i++) {
+    const item = filtered[i];
+    const div = document.createElement('div');
+    div.className = 'bg-white rounded overflow-hidden shadow cursor-pointer hover:shadow-lg transition-shadow';
+    div.innerHTML = `
+      <div class="bg-gray-100 flex items-center justify-center rounded-t-lg h-48 relative overflow-hidden">
+        <img src="images/${item.Photos[0]}" alt="${item.Item}" class="max-h-full max-w-full object-contain transition-transform hover:scale-105" onerror="this.src='images/placeholder.jpg'">
+        ${item.Photos.length > 1 ? `<div class="absolute bottom-2 right-2 bg-black bg-opacity-70 text-white text-xs px-2 py-1 rounded-full flex items-center gap-1"><svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg><span>${item.Photos.length}</span></div>` : ''}
+        ${item.Status !== 'Attivo' ? `<div class="absolute top-2 left-2 px-2 py-1 text-xs font-bold rounded text-white ${item.Status === 'Venduto' ? 'bg-red-600' : 'bg-yellow-600'}">${item.Status}</div>` : ''}
+        ${localStorage.getItem('adminToken') ? `
+          <select id="status-${item.UUID}" class="absolute top-2 right-2 text-xs p-1 rounded border" onchange="saveStatus()">
+            <option value="Attivo" ${item.Status === 'Attivo' ? 'selected' : ''}>Attivo</option>
+            <option value="Venduto" ${item.Status === 'Venduto' ? 'selected' : ''}>Venduto</option>
+            <option value="Prenotato" ${item.Status === 'Prenotato' ? 'selected' : ''}>Prenotato</option>
+          </select>
+        ` : ''}
+      </div>
+      <div class="p-3 h-32 flex flex-col justify-between bg-white">
+        <div>
+          <h3 class="font-semibold text-sm line-clamp-2 leading-tight">${item.Item}</h3>
+          <p class="text-xs text-gray-600 mt-1">Category: ${item.Location || '—'}</p>
+          <p class="text-xs text-gray-500">Serial: ${item['Serial No'] || '—'}</p>
+        </div>
+        <p class="text-sm font-medium text-indigo-600">Price: ${formatPrice(item)}</p>
+      </div>`;
+    div.onclick = () => openModal(item);
+    fragment.appendChild(div);
   }
+  container.appendChild(fragment);
+  displayed = end;
+  document.getElementById('loadMore').classList.toggle('hidden', displayed >= filtered.length);
 }
 
 function renderCartCount() {
@@ -322,33 +207,163 @@ function renderCartItems() {
   }).join('');
 }
 
-window.removeFromCart = function (uuid) {
+window.removeFromCart = function(uuid) {
   cart = cart.filter(id => id !== uuid);
-  localStorage.setItem('cart', JSON.stringify(cart));
   renderCartCount();
   renderCartItems();
+  saveCartToDrive();
 };
 
-async function saveCartToGitHub() {
-  if (cart.length === 0) return alert('Cart is empty');
-  const payload = {
-    items: cart.map(uuid => {
-      const it = allItems.find(i => i.UUID === uuid);
-      return { uuid, name: it.Item, thumbnail: it.Photos[0] };
-    }), savedAt: new Date().toISOString()
-  };
-  const filename = `carts/cart-${Date.now()}.json`;
-  const content = btoa(JSON.stringify(payload, null, 2));
+// ====== openModal() — FULLY RESTORED ======
+function openModal(item) {
+  document.getElementById('modalTitle').textContent = item.Item;
+  document.getElementById('modalDesc').innerHTML = `
+    <strong>Serial Number:</strong> ${item['Serial No'] || '—'}<br>
+    <strong>Category:</strong> ${item.Location || '—'}<br>
+    <strong>Scatola:</strong> ${item.Categories || '—'}<br>
+    ${item.Notes ? `<strong>Notes:</strong><br><span class="text-sm italic text-gray-700">${item.Notes.replace(/\n/g, '<br>')}</span><br>` : ''}
+    ${item['Purchase Date'] ? `<strong>Purchased:</strong> ${item['Purchase Date']}<br>` : ''}
+    <strong>Price:</strong> ${formatPrice(item)}
+  `;
+
+  const wrapper = document.getElementById('swiperWrapper');
+  wrapper.innerHTML = '';
+  item.Photos.forEach((src, idx) => {
+    const slide = document.createElement('div');
+    slide.className = 'swiper-slide flex items-center justify-center bg-gray-100';
+    slide.innerHTML = `<img src="images/${src}" alt="${item.Item} - ${idx + 1}" class="max-w-full max-h-full object-contain" onerror="this.src='images/placeholder.jpg'">`;
+    wrapper.appendChild(slide);
+  });
+
+  const addBtn = document.getElementById('addToCartBtn');
+  const inCart = cart.includes(item.UUID);
+  addBtn.disabled = inCart || item.Status !== 'Attivo';
+  addBtn.textContent = 
+    inCart ? 'Added' : 
+    item.Status === 'Venduto' ? 'Sold' :
+    item.Status === 'Prenotato' ? 'Reserved' :
+    'Add to Cart';
+  addBtn.className = 'w-full py-2 rounded text-white font-medium ' + (item.Status !== 'Attivo' ? 'bg-gray-400 cursor-not-allowed' : 'bg-indigo-600');
+  addBtn.onclick = () => addToCart(item.UUID);
+
+  document.getElementById('modal').classList.remove('hidden');
+  document.getElementById('closeModal').onclick = closeModal;
+
+  new Swiper('.mySwiper', {
+    loop: false,
+    pagination: { el: '.swiper-pagination', clickable: true },
+    navigation: { nextEl: '.swiper-button-next', prevEl: '.swiper-button-prev' },
+    spaceBetween: 0,
+    slidesPerView: 1,
+    touchRatio: 1,
+    grabCursor: true
+  });
+}
+
+function closeModal() {
+  document.getElementById('modal').classList.add('hidden');
+}
+
+// Google Login
+function onGoogleSignIn(googleUserProfile) {
+  googleUser = googleUserProfile;
+  const profile = googleUser.getBasicProfile();
+  document.getElementById('userInfo').innerHTML = `Hi, ${profile.getName()}`;
+  document.getElementById('userInfo').classList.remove('hidden');
+  document.getElementById('googleSignIn').classList.add('hidden');
+  loadCartFromDrive();
+}
+
+function signOut() {
+  gapi.auth2.getAuthInstance().signOut().then(() => {
+    googleUser = null; cart = []; renderCartCount(); renderCartItems();
+    document.getElementById('userInfo').classList.add('hidden');
+    document.getElementById('googleSignIn').classList.remove('hidden');
+  });
+}
+
+// Cart: Google Drive
+async function saveCartToDrive() {
+  if (!googleUser) return;
+  const accessToken = googleUser.getAuthResponse().access_token;
+  const fileContent = JSON.stringify({ items: cart, savedAt: new Date().toISOString() });
+  const fileName = 'sangottardo-cart.json';
+  let fileId = null;
   try {
-    const res = await fetch(`https://api.github.com/repos/${REPO}/contents/${filename}`, {
-      method: 'PUT',
-      headers: { Authorization: `token ${GITHUB_TOKEN}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ message: 'New cart', content })
-    });
-    if (!res.ok) throw await res.text();
-    alert('Cart saved!');
-  } catch (e) {
-    console.error(e);
-    alert('Failed to save cart');
+    const listRes = await fetch(`https://www.googleapis.com/drive/v3/files?q=name='${fileName}' and trashed=false`, { headers: { Authorization: `Bearer ${accessToken}` } });
+    const listData = await listRes.json();
+    fileId = listData.files[0]?.id;
+  } catch (e) {}
+  const metadata = { name: fileName, mimeType: 'application/json', parents: ['appDataFolder'] };
+  const form = new FormData();
+  form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
+  form.append('file', new Blob([fileContent], { type: 'application/json' }));
+  const url = fileId ? `https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=multipart` : 'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart';
+  await fetch(url, { method: fileId ? 'PATCH' : 'POST', headers: { Authorization: `Bearer ${accessToken}` }, body: form });
+}
+
+async function loadCartFromDrive() {
+  if (!googleUser) return;
+  const accessToken = googleUser.getAuthResponse().access_token;
+  try {
+    const res = await fetch(`https://www.googleapis.com/drive/v3/files?q=name='sangottardo-cart.json' and trashed=false`, { headers: { Authorization: `Bearer ${accessToken}` } });
+    const data = await res.json();
+    if (data.files.length > 0) {
+      const fileId = data.files[0].id;
+      const fileRes = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`, { headers: { Authorization: `Bearer ${accessToken}` } });
+      const fileData = await fileRes.json();
+      cart = fileData.items || [];
+      renderCartCount(); renderCartItems();
+    }
+  } catch (e) {}
+}
+
+function addToCart(uuid) {
+  const item = allItems.find(i => i.UUID === uuid);
+  if (!cart.includes(uuid) && item.Status === 'Attivo') {
+    cart.push(uuid);
+    renderCartCount(); renderCartItems();
+    saveCartToDrive();
   }
 }
+
+// Admin: Save Status
+async function saveStatus() {
+  if (!localStorage.getItem('adminToken')) return;
+  const statusObj = {};
+  allItems.forEach(item => {
+    const select = document.getElementById(`status-${item.UUID}`);
+    if (select) statusObj[item.UUID] = select.value;
+  });
+  const content = btoa(JSON.stringify(statusObj, null, 2));
+  const sha = await getFileSha('data/status.json');
+  await fetch(`https://api.github.com/repos/${REPO}/contents/data/status.json`, {
+    method: 'PUT',
+    headers: { Authorization: `token ${GITHUB_TOKEN}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ message: 'Update status', content, sha })
+  });
+}
+
+async function getFileSha(path) {
+  try {
+    const res = await fetch(`https://api.github.com/repos/${REPO}/contents/${path}`);
+    const data = await res.json();
+    return data.sha;
+  } catch (e) { return null; }
+}
+
+// Admin: View All Carts
+window.loadAllCarts = async function() {
+  const res = await fetch('carts/?_=' + Date.now());
+  const text = await res.text();
+  const files = text.match(/href="([^"]+\.json)"/g)?.map(m => m.match(/href="([^"]+)"/)[1]) || [];
+  const container = document.getElementById('allCarts');
+  container.innerHTML = '<h3 class="text-lg font-bold mb-2">All Saved Carts</h3>';
+  for (const file of files) {
+    const data = await (await fetch(file)).json();
+    const div = document.createElement('div');
+    div.className = 'p-2 border-b';
+    div.innerHTML = `<strong>${new Date(data.savedAt).toLocaleString()}</strong>: ${data.items.length} items`;
+    container.appendChild(div);
+  }
+};
