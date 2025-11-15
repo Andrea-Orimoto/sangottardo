@@ -138,17 +138,17 @@ function openModal(item) {
 
   item.Photos.forEach((src, idx) => {
     const slide = document.createElement('div');
-    slide.style.cssText = 'min-width:100%; flex-shrink:0; display:flex; align-items:center; justify-content:center; height:100%; padding:0 1rem; box-sizing:border-box; background:#f9fafb;';
-
+    slide.style.cssText = 'flex:0 0 100%; width:100%; display:flex; align-items:center; justify-content:center; height:100%; padding:0; margin:0; background:#f9fafb; box-sizing:border-box;';
+  
     const img = document.createElement('img');
     img.src = `images/${src}`;
     img.alt = `${item.Item} - ${idx + 1}`;
     img.style.cssText = 'max-width:100%; max-height:100%; object-fit:contain; display:block;';
-
+  
     img.onerror = () => { img.src = 'images/placeholder.jpg'; };
     slide.appendChild(img);
     track.appendChild(slide);
-
+  
     const dot = document.createElement('div');
     dot.className = 'carousel-dot';
     dot.dataset.index = idx;
