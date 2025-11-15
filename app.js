@@ -96,20 +96,58 @@ function filterItems() {
 
 function setupFilters() {
   const sel = document.getElementById('catFilter');
-  sel.innerHTML = '<option value="">All Categories</option>';
+  sel.innerHTML = ''; // Clear existing
+
+  // Count items per location
+  const locationCount = {};
+  allItems.forEach(item => {
+    const loc = item.Location || 'Uncategorized';
+    locationCount[loc] = (locationCount[loc] || 0) + 1;
+  });
+
+  // Add "All Categories" with total count
+  const totalItems = allItems.length;
+  const allOption = document.createElement('option');
+  allOption.value = '';
+  allOption.textContent = `All Categories (${totalItems})`;
+  sel.appendChild(allOption);
+
+  // Add each location with count
   const locations = [...new Set(allItems.map(i => i.Location).filter(Boolean))].sort();
   locations.forEach(loc => {
     const opt = document.createElement('option');
     opt.value = loc;
-    opt.textContent = loc;
+    opt.textContent = `${loc} (${locationCount[loc]})`;
     sel.appendChild(opt);
   });
+
+  // Uncategorized
+  if (locationCount['Uncategorized']) {
+    const opt = document.createElement('option');
+    opt.value = '';
+    opt.textContent = `Uncategorized (${locationCount['Uncategorized']})`;
+    sel.appendChild(opt);
+  }
+
+  // Re-apply current filter if any
+  const currentFilter = new URLSearchParams(window.location.search).get('cat') || '';
+  if (currentFilter) sel.value = locations.includes(currentFilter) ? currentFilter : '';
+
+  // Event listeners
   let timeout;
   document.getElementById('search').addEventListener('input', (e) => {
     clearTimeout(timeout);
     timeout = setTimeout(() => { displayed = 0; renderGrid(); }, 300);
   });
-  document.getElementById('catFilter').addEventListener('change', () => { displayed = 0; renderGrid(); });
+  document.getElementById('catFilter').addEventListener('change', () => {
+    displayed = 0;
+    const url = new URL(window.location);
+    const val = sel.value;
+    if (val) url.searchParams.set('cat', val);
+    else url.searchParams.delete('cat');
+    window.history.replaceState({}, '', url);
+    renderGrid();
+  });
 }
 
 function clearFilters() {
