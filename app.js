@@ -31,119 +31,122 @@ async function init() {
   document.getElementById('closeCart').onclick = () => toggleCart(false);
   document.getElementById('loadMore').onclick = () => renderGrid(true);
   document.getElementById('clearFilters').onclick = clearFilters;
-  if (localStorage.getItem('adminToken')) document.getElementById('adminLink').classList.remove('hidden');
-}
-
-async function loadCSVAndStatus() {
-  try {
-    const resp = await fetch('data/items.csv');
-    const text = await resp.text();
-    const parsed = Papa.parse(text, { header: true, skipEmptyLines: true });
-    const map = new Map();
-    parsed.data.forEach(row => {
-      const uuid = row.UUID;
-      if (!uuid) return;
-      if (!map.has(uuid)) map.set(uuid, { ...row, Photos: [] });
-      const photos = (row.Photos || '').trim().split(/\s+/).filter(Boolean);
-      if (photos.length) map.get(uuid).Photos.push(...photos);
-    });
-    allItems = Array.from(map.values()).filter(i => i.Photos && i.Photos.length > 0);
-
-    try {
-      const statusResp = await fetch('data/status.json');
-      const statusData = await statusResp.json();
-      allItems.forEach(item => {
-        item.Status = statusData[item.UUID] || 'Attivo';
-      });
-    } catch (e) {
-      allItems.forEach(item => item.Status = 'Attivo');
-    }
-  } catch (e) {
-    console.error('Load error:', e);
-    allItems = [];
+  const adminLink = document.getElementById('adminLink');
+  if (adminLink && localStorage.getItem('adminToken')) {
+    adminLink.classList.remove('hidden');
   }
-}
 
-function formatPrice(item) {
-  const price = item['Purchase Price'];
-  const currency = item['Purchase Currency'] || 'EUR';
-  return price ? `${price} ${currency}` : '—';
-}
+  async function loadCSVAndStatus() {
+    try {
+      const resp = await fetch('data/items.csv');
+      const text = await resp.text();
+      const parsed = Papa.parse(text, { header: true, skipEmptyLines: true });
+      const map = new Map();
+      parsed.data.forEach(row => {
+        const uuid = row.UUID;
+        if (!uuid) return;
+        if (!map.has(uuid)) map.set(uuid, { ...row, Photos: [] });
+        const photos = (row.Photos || '').trim().split(/\s+/).filter(Boolean);
+        if (photos.length) map.get(uuid).Photos.push(...photos);
+      });
+      allItems = Array.from(map.values()).filter(i => i.Photos && i.Photos.length > 0);
 
-function filterItems() {
-  const q = (document.getElementById('search').value || '').toLowerCase().trim();
-  const locFilter = document.getElementById('catFilter').value;
-  const statusFilter = document.getElementById('statusFilter')?.value || '';
-  return allItems.filter(item => {
-    const searchText = (item.Item + ' ' + (item.Location || '') + ' ' + (item.Categories || '') + ' ' + (item.Notes || '')).toLowerCase();
-    const matchSearch = !q || searchText.includes(q);
-    const matchLocation = !locFilter || (item.Location || '').trim() === locFilter;
-    const matchStatus = !statusFilter || item.Status === statusFilter;
-    return matchSearch && matchLocation && matchStatus;
-  });
-}
+      try {
+        const statusResp = await fetch('data/status.json');
+        const statusData = await statusResp.json();
+        allItems.forEach(item => {
+          item.Status = statusData[item.UUID] || 'Attivo';
+        });
+      } catch (e) {
+        allItems.forEach(item => item.Status = 'Attivo');
+      }
+    } catch (e) {
+      console.error('Load error:', e);
+      allItems = [];
+    }
+  }
 
-function setupFilters() {
-  const sel = document.getElementById('catFilter');
-  sel.innerHTML = '<option value="">All Categories</option>';
-  const locations = [...new Set(allItems.map(i => i.Location).filter(Boolean))].sort();
-  const locationCount = {};
-  allItems.forEach(item => {
-    const loc = item.Location || 'Uncategorized';
-    locationCount[loc] = (locationCount[loc] || 0) + 1;
-  });
-  const totalItems = allItems.length;
-  const allOption = document.createElement('option');
-  allOption.value = '';
-  allOption.textContent = `All Categories (${totalItems})`;
-  sel.appendChild(allOption);
-  locations.forEach(loc => {
-    const opt = document.createElement('option');
-    opt.value = loc;
-    opt.textContent = `${loc} (${locationCount[loc]})`;
-    sel.appendChild(opt);
-  });
+  function formatPrice(item) {
+    const price = item['Purchase Price'];
+    const currency = item['Purchase Currency'] || 'EUR';
+    return price ? `${price} ${currency}` : '—';
+  }
 
-  const statusSel = document.createElement('select');
-  statusSel.id = 'statusFilter';
-  statusSel.className = 'ml-2 p-2 border rounded';
-  statusSel.innerHTML = `
+  function filterItems() {
+    const q = (document.getElementById('search').value || '').toLowerCase().trim();
+    const locFilter = document.getElementById('catFilter').value;
+    //const statusFilter = document.getElementById('statusFilter')?.value || '';
+    return allItems.filter(item => {
+      const searchText = (item.Item + ' ' + (item.Location || '') + ' ' + (item.Categories || '') + ' ' + (item.Notes || '')).toLowerCase();
+      const matchSearch = !q || searchText.includes(q);
+      const matchLocation = !locFilter || (item.Location || '').trim() === locFilter;
+      const matchStatus = !statusFilter || item.Status === statusFilter;
+      return matchSearch && matchLocation && matchStatus;
+    });
+  }
+
+  function setupFilters() {
+    const sel = document.getElementById('catFilter');
+    sel.innerHTML = '<option value="">All Categories</option>';
+    const locations = [...new Set(allItems.map(i => i.Location).filter(Boolean))].sort();
+    const locationCount = {};
+    allItems.forEach(item => {
+      const loc = item.Location || 'Uncategorized';
+      locationCount[loc] = (locationCount[loc] || 0) + 1;
+    });
+    const totalItems = allItems.length;
+    const allOption = document.createElement('option');
+    allOption.value = '';
+    allOption.textContent = `All Categories (${totalItems})`;
+    sel.appendChild(allOption);
+    locations.forEach(loc => {
+      const opt = document.createElement('option');
+      opt.value = loc;
+      opt.textContent = `${loc} (${locationCount[loc]})`;
+      sel.appendChild(opt);
+    });
+
+    const statusSel = document.createElement('select');
+    statusSel.id = 'statusFilter';
+    statusSel.className = 'ml-2 p-2 border rounded';
+    statusSel.innerHTML = `
     <option value="">All Status</option>
     <option value="Attivo">Attivo</option>
     <option value="Venduto">Venduto</option>
     <option value="Prenotato">Prenotato</option>
   `;
-  document.querySelector('#filters').appendChild(statusSel);
+  const filtersDiv = document.querySelector('#filters');
+  if (filtersDiv) filtersDiv.appendChild(statusSel);
 
-  let timeout;
-  document.getElementById('search').addEventListener('input', (e) => {
-    clearTimeout(timeout);
-    timeout = setTimeout(() => { displayed = 0; renderGrid(); }, 300);
-  });
-  document.getElementById('catFilter').addEventListener('change', () => { displayed = 0; renderGrid(); });
-  statusSel.addEventListener('change', () => { displayed = 0; renderGrid(); });
-}
+    let timeout;
+    document.getElementById('search').addEventListener('input', (e) => {
+      clearTimeout(timeout);
+      timeout = setTimeout(() => { displayed = 0; renderGrid(); }, 300);
+    });
+    document.getElementById('catFilter').addEventListener('change', () => { displayed = 0; renderGrid(); });
+    statusSel.addEventListener('change', () => { displayed = 0; renderGrid(); });
+  }
 
-function clearFilters() {
-  document.getElementById('search').value = '';
-  document.getElementById('catFilter').value = '';
-  if (document.getElementById('statusFilter')) document.getElementById('statusFilter').value = '';
-  displayed = 0;
-  renderGrid();
-}
+  function clearFilters() {
+    document.getElementById('search').value = '';
+    document.getElementById('catFilter').value = '';
+    if (document.getElementById('statusFilter')) document.getElementById('statusFilter').value = '';
+    displayed = 0;
+    renderGrid();
+  }
 
-function renderGrid(loadMore = false) {
-  if (!loadMore) { document.getElementById('grid').innerHTML = ''; displayed = 0; }
-  const container = document.getElementById('grid');
-  const fragment = document.createDocumentFragment();
-  const filtered = filterItems();
-  const start = displayed;
-  const end = Math.min(start + PAGE_SIZE, filtered.length);
-  for (let i = start; i < end; i++) {
-    const item = filtered[i];
-    const div = document.createElement('div');
-    div.className = 'bg-white rounded overflow-hidden shadow cursor-pointer hover:shadow-lg transition-shadow';
-    div.innerHTML = `
+  function renderGrid(loadMore = false) {
+    if (!loadMore) { document.getElementById('grid').innerHTML = ''; displayed = 0; }
+    const container = document.getElementById('grid');
+    const fragment = document.createDocumentFragment();
+    const filtered = filterItems();
+    const start = displayed;
+    const end = Math.min(start + PAGE_SIZE, filtered.length);
+    for (let i = start; i < end; i++) {
+      const item = filtered[i];
+      const div = document.createElement('div');
+      div.className = 'bg-white rounded overflow-hidden shadow cursor-pointer hover:shadow-lg transition-shadow';
+      div.innerHTML = `
       <div class="bg-gray-100 flex items-center justify-center rounded-t-lg h-48 relative overflow-hidden">
         <img src="images/${item.Photos[0]}" alt="${item.Item}" class="max-h-full max-w-full object-contain transition-transform hover:scale-105" onerror="this.src='images/placeholder.jpg'">
         ${item.Photos.length > 1 ? `<div class="absolute bottom-2 right-2 bg-black bg-opacity-70 text-white text-xs px-2 py-1 rounded-full flex items-center gap-1"><svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg><span>${item.Photos.length}</span></div>` : ''}
@@ -164,37 +167,37 @@ function renderGrid(loadMore = false) {
         </div>
         <p class="text-sm font-medium text-indigo-600">Price: ${formatPrice(item)}</p>
       </div>`;
-    div.onclick = () => openModal(item);
-    fragment.appendChild(div);
+      div.onclick = () => openModal(item);
+      fragment.appendChild(div);
+    }
+    container.appendChild(fragment);
+    displayed = end;
+    document.getElementById('loadMore').classList.toggle('hidden', displayed >= filtered.length);
   }
-  container.appendChild(fragment);
-  displayed = end;
-  document.getElementById('loadMore').classList.toggle('hidden', displayed >= filtered.length);
-}
 
-function renderCartCount() {
-  document.getElementById('cartCount').textContent = cart.length;
-}
-
-function toggleCart(show = null) {
-  const sidebar = document.getElementById('cartSidebar');
-  const isOpen = !sidebar.classList.contains('translate-x-full');
-  if (show === null) show = !isOpen;
-  sidebar.classList.toggle('translate-x-0', show);
-  sidebar.classList.toggle('translate-x-full', !show);
-  if (show) renderCartItems();
-}
-
-function renderCartItems() {
-  const container = document.getElementById('cartItems');
-  if (cart.length === 0) {
-    container.innerHTML = '<p class="text-gray-500 italic">Cart is empty</p>';
-    return;
+  function renderCartCount() {
+    document.getElementById('cartCount').textContent = cart.length;
   }
-  container.innerHTML = cart.map(uuid => {
-    const item = allItems.find(i => i.UUID === uuid);
-    if (!item) return '';
-    return `
+
+  function toggleCart(show = null) {
+    const sidebar = document.getElementById('cartSidebar');
+    const isOpen = !sidebar.classList.contains('translate-x-full');
+    if (show === null) show = !isOpen;
+    sidebar.classList.toggle('translate-x-0', show);
+    sidebar.classList.toggle('translate-x-full', !show);
+    if (show) renderCartItems();
+  }
+
+  function renderCartItems() {
+    const container = document.getElementById('cartItems');
+    if (cart.length === 0) {
+      container.innerHTML = '<p class="text-gray-500 italic">Cart is empty</p>';
+      return;
+    }
+    container.innerHTML = cart.map(uuid => {
+      const item = allItems.find(i => i.UUID === uuid);
+      if (!item) return '';
+      return `
       <div class="flex items-center gap-3 mb-3 p-2 border rounded">
         <img src="images/${item.Photos[0]}" class="w-16 h-16 object-cover rounded" onerror="this.src='images/placeholder.jpg';">
         <div class="flex-1">
@@ -204,20 +207,20 @@ function renderCartItems() {
         <button class="text-red-600 text-sm" onclick="removeFromCart('${uuid}')">Remove</button>
       </div>
     `;
-  }).join('');
-}
+    }).join('');
+  }
 
-window.removeFromCart = function(uuid) {
-  cart = cart.filter(id => id !== uuid);
-  renderCartCount();
-  renderCartItems();
-  saveCartToDrive();
-};
+  window.removeFromCart = function (uuid) {
+    cart = cart.filter(id => id !== uuid);
+    renderCartCount();
+    renderCartItems();
+    saveCartToDrive();
+  };
 
-// ====== openModal() — FULLY RESTORED ======
-function openModal(item) {
-  document.getElementById('modalTitle').textContent = item.Item;
-  document.getElementById('modalDesc').innerHTML = `
+  // ====== openModal() — FULLY RESTORED ======
+  function openModal(item) {
+    document.getElementById('modalTitle').textContent = item.Item;
+    document.getElementById('modalDesc').innerHTML = `
     <strong>Serial Number:</strong> ${item['Serial No'] || '—'}<br>
     <strong>Category:</strong> ${item.Location || '—'}<br>
     <strong>Scatola:</strong> ${item.Categories || '—'}<br>
@@ -226,144 +229,145 @@ function openModal(item) {
     <strong>Price:</strong> ${formatPrice(item)}
   `;
 
-  const wrapper = document.getElementById('swiperWrapper');
-  wrapper.innerHTML = '';
-  item.Photos.forEach((src, idx) => {
-    const slide = document.createElement('div');
-    slide.className = 'swiper-slide flex items-center justify-center bg-gray-100';
-    slide.innerHTML = `<img src="images/${src}" alt="${item.Item} - ${idx + 1}" class="max-w-full max-h-full object-contain" onerror="this.src='images/placeholder.jpg'">`;
-    wrapper.appendChild(slide);
-  });
+    const wrapper = document.getElementById('swiperWrapper');
+    wrapper.innerHTML = '';
+    item.Photos.forEach((src, idx) => {
+      const slide = document.createElement('div');
+      slide.className = 'swiper-slide flex items-center justify-center bg-gray-100';
+      slide.innerHTML = `<img src="images/${src}" alt="${item.Item} - ${idx + 1}" class="max-w-full max-h-full object-contain" onerror="this.src='images/placeholder.jpg'">`;
+      wrapper.appendChild(slide);
+    });
 
-  const addBtn = document.getElementById('addToCartBtn');
-  const inCart = cart.includes(item.UUID);
-  addBtn.disabled = inCart || item.Status !== 'Attivo';
-  addBtn.textContent = 
-    inCart ? 'Added' : 
-    item.Status === 'Venduto' ? 'Sold' :
-    item.Status === 'Prenotato' ? 'Reserved' :
-    'Add to Cart';
-  addBtn.className = 'w-full py-2 rounded text-white font-medium ' + (item.Status !== 'Attivo' ? 'bg-gray-400 cursor-not-allowed' : 'bg-indigo-600');
-  addBtn.onclick = () => addToCart(item.UUID);
+    const addBtn = document.getElementById('addToCartBtn');
+    const inCart = cart.includes(item.UUID);
+    addBtn.disabled = inCart || item.Status !== 'Attivo';
+    addBtn.textContent =
+      inCart ? 'Added' :
+        item.Status === 'Venduto' ? 'Sold' :
+          item.Status === 'Prenotato' ? 'Reserved' :
+            'Add to Cart';
+    addBtn.className = 'w-full py-2 rounded text-white font-medium ' + (item.Status !== 'Attivo' ? 'bg-gray-400 cursor-not-allowed' : 'bg-indigo-600');
+    addBtn.onclick = () => addToCart(item.UUID);
 
-  document.getElementById('modal').classList.remove('hidden');
-  document.getElementById('closeModal').onclick = closeModal;
+    document.getElementById('modal').classList.remove('hidden');
+    document.getElementById('closeModal').onclick = closeModal;
 
-  new Swiper('.mySwiper', {
-    loop: false,
-    pagination: { el: '.swiper-pagination', clickable: true },
-    navigation: { nextEl: '.swiper-button-next', prevEl: '.swiper-button-prev' },
-    spaceBetween: 0,
-    slidesPerView: 1,
-    touchRatio: 1,
-    grabCursor: true
-  });
-}
+    new Swiper('.mySwiper', {
+      loop: false,
+      pagination: { el: '.swiper-pagination', clickable: true },
+      navigation: { nextEl: '.swiper-button-next', prevEl: '.swiper-button-prev' },
+      spaceBetween: 0,
+      slidesPerView: 1,
+      touchRatio: 1,
+      grabCursor: true
+    });
+  }
 
-function closeModal() {
-  document.getElementById('modal').classList.add('hidden');
-}
+  function closeModal() {
+    document.getElementById('modal').classList.add('hidden');
+  }
 
-// Google Login
-function onGoogleSignIn(googleUserProfile) {
-  googleUser = googleUserProfile;
-  const profile = googleUser.getBasicProfile();
-  document.getElementById('userInfo').innerHTML = `Hi, ${profile.getName()}`;
-  document.getElementById('userInfo').classList.remove('hidden');
-  document.getElementById('googleSignIn').classList.add('hidden');
-  loadCartFromDrive();
-}
+  // Google Login
+  function onGoogleSignIn(googleUserProfile) {
+    googleUser = googleUserProfile;
+    const profile = googleUser.getBasicProfile();
+    document.getElementById('userInfo').innerHTML = `Hi, ${profile.getName()}`;
+    document.getElementById('userInfo').classList.remove('hidden');
+    document.getElementById('googleSignIn').classList.add('hidden');
+    loadCartFromDrive();
+  }
 
-function signOut() {
-  gapi.auth2.getAuthInstance().signOut().then(() => {
-    googleUser = null; cart = []; renderCartCount(); renderCartItems();
-    document.getElementById('userInfo').classList.add('hidden');
-    document.getElementById('googleSignIn').classList.remove('hidden');
-  });
-}
+  function signOut() {
+    gapi.auth2.getAuthInstance().signOut().then(() => {
+      googleUser = null; cart = []; renderCartCount(); renderCartItems();
+      document.getElementById('userInfo').classList.add('hidden');
+      document.getElementById('googleSignIn').classList.remove('hidden');
+    });
+  }
 
-// Cart: Google Drive
-async function saveCartToDrive() {
-  if (!googleUser) return;
-  const accessToken = googleUser.getAuthResponse().access_token;
-  const fileContent = JSON.stringify({ items: cart, savedAt: new Date().toISOString() });
-  const fileName = 'sangottardo-cart.json';
-  let fileId = null;
-  try {
-    const listRes = await fetch(`https://www.googleapis.com/drive/v3/files?q=name='${fileName}' and trashed=false`, { headers: { Authorization: `Bearer ${accessToken}` } });
-    const listData = await listRes.json();
-    fileId = listData.files[0]?.id;
-  } catch (e) {}
-  const metadata = { name: fileName, mimeType: 'application/json', parents: ['appDataFolder'] };
-  const form = new FormData();
-  form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
-  form.append('file', new Blob([fileContent], { type: 'application/json' }));
-  const url = fileId ? `https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=multipart` : 'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart';
-  await fetch(url, { method: fileId ? 'PATCH' : 'POST', headers: { Authorization: `Bearer ${accessToken}` }, body: form });
-}
+  // Cart: Google Drive
+  async function saveCartToDrive() {
+    if (!googleUser) return;
+    const accessToken = googleUser.getAuthResponse().access_token;
+    const fileContent = JSON.stringify({ items: cart, savedAt: new Date().toISOString() });
+    const fileName = 'sangottardo-cart.json';
+    let fileId = null;
+    try {
+      const listRes = await fetch(`https://www.googleapis.com/drive/v3/files?q=name='${fileName}' and trashed=false`, { headers: { Authorization: `Bearer ${accessToken}` } });
+      const listData = await listRes.json();
+      fileId = listData.files[0]?.id;
+    } catch (e) { }
+    const metadata = { name: fileName, mimeType: 'application/json', parents: ['appDataFolder'] };
+    const form = new FormData();
+    form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
+    form.append('file', new Blob([fileContent], { type: 'application/json' }));
+    const url = fileId ? `https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=multipart` : 'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart';
+    await fetch(url, { method: fileId ? 'PATCH' : 'POST', headers: { Authorization: `Bearer ${accessToken}` }, body: form });
+  }
 
-async function loadCartFromDrive() {
-  if (!googleUser) return;
-  const accessToken = googleUser.getAuthResponse().access_token;
-  try {
-    const res = await fetch(`https://www.googleapis.com/drive/v3/files?q=name='sangottardo-cart.json' and trashed=false`, { headers: { Authorization: `Bearer ${accessToken}` } });
-    const data = await res.json();
-    if (data.files.length > 0) {
-      const fileId = data.files[0].id;
-      const fileRes = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`, { headers: { Authorization: `Bearer ${accessToken}` } });
-      const fileData = await fileRes.json();
-      cart = fileData.items || [];
+  async function loadCartFromDrive() {
+    if (!googleUser) return;
+    const accessToken = googleUser.getAuthResponse().access_token;
+    try {
+      const res = await fetch(`https://www.googleapis.com/drive/v3/files?q=name='sangottardo-cart.json' and trashed=false`, { headers: { Authorization: `Bearer ${accessToken}` } });
+      const data = await res.json();
+      if (data.files.length > 0) {
+        const fileId = data.files[0].id;
+        const fileRes = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`, { headers: { Authorization: `Bearer ${accessToken}` } });
+        const fileData = await fileRes.json();
+        cart = fileData.items || [];
+        renderCartCount(); renderCartItems();
+      }
+    } catch (e) { }
+  }
+
+  function addToCart(uuid) {
+    const item = allItems.find(i => i.UUID === uuid);
+    if (!cart.includes(uuid) && item.Status === 'Attivo') {
+      cart.push(uuid);
       renderCartCount(); renderCartItems();
+      saveCartToDrive();
     }
-  } catch (e) {}
-}
-
-function addToCart(uuid) {
-  const item = allItems.find(i => i.UUID === uuid);
-  if (!cart.includes(uuid) && item.Status === 'Attivo') {
-    cart.push(uuid);
-    renderCartCount(); renderCartItems();
-    saveCartToDrive();
   }
-}
 
-// Admin: Save Status
-async function saveStatus() {
-  if (!localStorage.getItem('adminToken')) return;
-  const statusObj = {};
-  allItems.forEach(item => {
-    const select = document.getElementById(`status-${item.UUID}`);
-    if (select) statusObj[item.UUID] = select.value;
-  });
-  const content = btoa(JSON.stringify(statusObj, null, 2));
-  const sha = await getFileSha('data/status.json');
-  await fetch(`https://api.github.com/repos/${REPO}/contents/data/status.json`, {
-    method: 'PUT',
-    headers: { Authorization: `token ${GITHUB_TOKEN}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ message: 'Update status', content, sha })
-  });
-}
-
-async function getFileSha(path) {
-  try {
-    const res = await fetch(`https://api.github.com/repos/${REPO}/contents/${path}`);
-    const data = await res.json();
-    return data.sha;
-  } catch (e) { return null; }
-}
-
-// Admin: View All Carts
-window.loadAllCarts = async function() {
-  const res = await fetch('carts/?_=' + Date.now());
-  const text = await res.text();
-  const files = text.match(/href="([^"]+\.json)"/g)?.map(m => m.match(/href="([^"]+)"/)[1]) || [];
-  const container = document.getElementById('allCarts');
-  container.innerHTML = '<h3 class="text-lg font-bold mb-2">All Saved Carts</h3>';
-  for (const file of files) {
-    const data = await (await fetch(file)).json();
-    const div = document.createElement('div');
-    div.className = 'p-2 border-b';
-    div.innerHTML = `<strong>${new Date(data.savedAt).toLocaleString()}</strong>: ${data.items.length} items`;
-    container.appendChild(div);
+  // Admin: Save Status
+  async function saveStatus() {
+    if (!localStorage.getItem('adminToken')) return;
+    const statusObj = {};
+    allItems.forEach(item => {
+      const select = document.getElementById(`status-${item.UUID}`);
+      if (select) statusObj[item.UUID] = select.value;
+    });
+    const content = btoa(JSON.stringify(statusObj, null, 2));
+    const sha = await getFileSha('data/status.json');
+    await fetch(`https://api.github.com/repos/${REPO}/contents/data/status.json`, {
+      method: 'PUT',
+      headers: { Authorization: `token ${GITHUB_TOKEN}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message: 'Update status', content, sha })
+    });
   }
-};
+
+  async function getFileSha(path) {
+    try {
+      const res = await fetch(`https://api.github.com/repos/${REPO}/contents/${path}`);
+      const data = await res.json();
+      return data.sha;
+    } catch (e) { return null; }
+  }
+
+  // Admin: View All Carts
+  window.loadAllCarts = async function () {
+    const res = await fetch('carts/?_=' + Date.now());
+    const text = await res.text();
+    const files = text.match(/href="([^"]+\.json)"/g)?.map(m => m.match(/href="([^"]+)"/)[1]) || [];
+    const container = document.getElementById('allCarts');
+    container.innerHTML = '<h3 class="text-lg font-bold mb-2">All Saved Carts</h3>';
+    for (const file of files) {
+      const data = await (await fetch(file)).json();
+      const div = document.createElement('div');
+      div.className = 'p-2 border-b';
+      div.innerHTML = `<strong>${new Date(data.savedAt).toLocaleString()}</strong>: ${data.items.length} items`;
+      container.appendChild(div);
+    }
+  };
+}

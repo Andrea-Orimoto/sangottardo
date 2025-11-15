@@ -7,9 +7,23 @@
     <title>Inventario San Gottardo</title>
     <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
     <link href="style.css?6" rel="stylesheet">
+
     <!-- Google Sign-In SDK -->
     <meta name="google-signin-client_id"
         content="1049409960184-lt0jqecoman6nmnfgc94ntss04vemur2.apps.googleusercontent.com">
+    <script>
+        function renderGoogleButton() {
+            if (!window.gapi) return setTimeout(renderGoogleButton, 100);
+            gapi.load('signin2', () => {
+                gapi.signin2.render('googleSignIn', {
+                    scope: 'profile email https://www.googleapis.com/auth/drive.appdata',
+                    width: 200, height: 40, longtitle: true, theme: 'dark',
+                    onsuccess: onGoogleSignIn,
+                    onfailure: () => console.log('Google login failed')
+                });
+            });
+        }
+    </script>
     <script src="https://apis.google.com/js/platform.js?onload=renderGoogleButton" async defer></script>
     <script src="https://apis.google.com/js/api.js"></script>
 </head>
@@ -19,6 +33,7 @@
         <header class="flex justify-between items-center mb-8">
             <h1 class="text-3xl font-bold">Inventario San Gottardo</h1>
             <div class="flex gap-2">
+                <a id="adminLink" href="admin.html" class="hidden text-indigo-600 text-sm">Admin</a>
                 <!-- Login Button (near cart icon) -->
                 <div id="googleSignIn" class="inline-block"></div>
                 <div id="userInfo" class="hidden text-sm text-gray-600 ml-2"></div>
