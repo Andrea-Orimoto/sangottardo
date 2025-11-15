@@ -27,26 +27,26 @@
     <script src="https://apis.google.com/js/platform.js?onload=renderGoogleButton" async defer></script>
     <script src="https://apis.google.com/js/api.js"></script>
     <script>
-  function renderGoogleButton() {
-    if (!window.gapi) {
-      setTimeout(renderGoogleButton, 100);
-      return;
-    }
-    gapi.load('signin2', function() {
-      gapi.signin2.render('googleSignIn', {
-        scope: 'profile email https://www.googleapis.com/auth/drive.appdata',
-        width: 200,
-        height: 40,
-        longtitle: true,
-        theme: 'dark',
-        onsuccess: onGoogleSignIn,
-        onfailure: function() { console.log('Google sign-in failed'); }
-      });
-    });
-  }
-</script>
-<script src="https://apis.google.com/js/platform.js?onload=renderGoogleButton" async defer></script>
-<script src="https://apis.google.com/js/api.js"></script>
+        function renderGoogleButton() {
+            if (!window.gapi) {
+                setTimeout(renderGoogleButton, 100);
+                return;
+            }
+            gapi.load('signin2', function () {
+                gapi.signin2.render('googleSignIn', {
+                    scope: 'profile email https://www.googleapis.com/auth/drive.appdata',
+                    width: 200,
+                    height: 40,
+                    longtitle: true,
+                    theme: 'dark',
+                    onsuccess: onGoogleSignIn,
+                    onfailure: function () { console.log('Google sign-in failed'); }
+                });
+            });
+        }
+    </script>
+    <script src="https://apis.google.com/js/platform.js?onload=renderGoogleButton" async defer></script>
+    <script src="https://apis.google.com/js/api.js"></script>
 </head>
 
 <body class="bg-gray-50 text-gray-800">
@@ -74,11 +74,11 @@
             <button id="clearFilters" class="bg-gray-300 px-3 py-2 rounded">Clear</button>
         </div>
 
-        <!-- Grid -->
-        <div id="grid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6"></div>
+        <!-- GRID CONTAINER -->
+        <div id="grid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6 mb-8"></div>
 
-        <!-- Load more -->
-        <div class="text-center mt-8">
+        <!-- Load More Button -->
+        <div class="text-center">
             <button id="loadMore" class="bg-indigo-600 text-white px-6 py-2 rounded hidden">Load More</button>
         </div>
 
@@ -123,53 +123,53 @@
 
     <script src="https://unpkg.com/papaparse@5.4.1/papaparse.min.js"></script>
     <script src="app.js?6"></script>
-<script>
-  // === GLOBAL FUNCTIONS FOR GOOGLE SDK ===
-  let googleUser = null;
+    <script>
+        // === GLOBAL FUNCTIONS FOR GOOGLE SDK ===
+        let googleUser = null;
 
-  function onGoogleSignIn(googleUserProfile) {
-    googleUser = googleUserProfile;
-    const profile = googleUser.getBasicProfile();
-    const userInfo = document.getElementById('userInfo');
-    if (userInfo) {
-      userInfo.innerHTML = `Hi, ${profile.getName()}`;
-      userInfo.classList.remove('hidden');
-    }
-    const signInDiv = document.getElementById('googleSignIn');
-    if (signInDiv) signInDiv.classList.add('hidden');
-    // Call app.js function
-    if (typeof loadCartFromDrive === 'function') {
-      loadCartFromDrive();
-    }
-  }
+        function onGoogleSignIn(googleUserProfile) {
+            googleUser = googleUserProfile;
+            const profile = googleUser.getBasicProfile();
+            const userInfo = document.getElementById('userInfo');
+            if (userInfo) {
+                userInfo.innerHTML = `Hi, ${profile.getName()}`;
+                userInfo.classList.remove('hidden');
+            }
+            const signInDiv = document.getElementById('googleSignIn');
+            if (signInDiv) signInDiv.classList.add('hidden');
+            // Call app.js function
+            if (typeof loadCartFromDrive === 'function') {
+                loadCartFromDrive();
+            }
+        }
 
-  function renderGoogleButton() {
-    if (!window.gapi) {
-      setTimeout(renderGoogleButton, 100);
-      return;
-    }
-    gapi.load('signin2', function() {
-      gapi.signin2.render('googleSignIn', {
-        scope: 'profile email https://www.googleapis.com/auth/drive.appdata',
-        width: 200,
-        height: 40,
-        longtitle: true,
-        theme: 'dark',
-        onsuccess: onGoogleSignIn,
-        onfailure: function() { console.log('Google sign-in failed'); }
-      });
-    });
-  }
-</script>
+        function renderGoogleButton() {
+            if (!window.gapi) {
+                setTimeout(renderGoogleButton, 100);
+                return;
+            }
+            gapi.load('signin2', function () {
+                gapi.signin2.render('googleSignIn', {
+                    scope: 'profile email https://www.googleapis.com/auth/drive.appdata',
+                    width: 200,
+                    height: 40,
+                    longtitle: true,
+                    theme: 'dark',
+                    onsuccess: onGoogleSignIn,
+                    onfailure: function () { console.log('Google sign-in failed'); }
+                });
+            });
+        }
+    </script>
 
-<!-- Google SDK -->
-<script src="https://apis.google.com/js/platform.js?onload=renderGoogleButton" async defer></script>
-<script src="https://apis.google.com/js/api.js"></script>
+    <!-- Google SDK -->
+    <script src="https://apis.google.com/js/platform.js?onload=renderGoogleButton" async defer></script>
+    <script src="https://apis.google.com/js/api.js"></script>
 
-<script>
-  console.log("APP.JS TEST: This should appear");
-</script>
-<script src="app.js"></script>
+    <script>
+        console.log("APP.JS TEST: This should appear");
+    </script>
+    <script src="app.js"></script>
 </body>
 
 </html>
