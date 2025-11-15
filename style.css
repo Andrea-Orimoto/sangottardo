@@ -40,10 +40,9 @@
     max-height: 500px;
     display: flex;
     transition: transform 0.3s ease-in-out;
-    overflow: hidden;
+    overflow: hidden;  /* Hide slides outside view */
+    width: 100%;       /* Full width */
 }
-
-
 
 #carouselTrack img {
     width: 100%;
@@ -53,6 +52,14 @@
     object-position: center;
 }
 
+#carouselTrack > div {  /* Each slide */
+    flex-shrink: 0;    /* Don't shrink */
+    width: 100%;       /* Exact full width */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  
 /* Dots */
 .carousel-dot {
     width: 10px;

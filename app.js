@@ -143,16 +143,25 @@ function openModal(item) {
   dotsContainer.innerHTML = '';
 
   item.Photos.forEach((src, idx) => {
+    // Slide wrapper (explicit 100% width)
     const slide = document.createElement('div');
-    slide.className = 'min-w-full flex items-center justify-center bg-gray-100';
+    slide.className = 'w-full flex items-center justify-center bg-gray-100 min-h-[60vh]';  // Full width + height
+    
     const img = document.createElement('img');
     img.src = `images/${src}`;
     img.alt = `${item.Item} - ${idx + 1}`;
-    img.className = 'max-w-full max-h-full object-contain';
-    img.onerror = () => { img.src = 'images/placeholder.jpg'; };
+    img.className = 'max-w-full max-h-full object-contain';  // Fit to container
+    img.style.opacity = '0';  // Start hidden
+    img.onerror = () => { 
+      img.src = 'images/placeholder.jpg'; 
+      img.style.opacity = '1'; 
+    };
+    img.onload = () => { img.style.opacity = '1'; };  // Fade in when loaded
+  
     slide.appendChild(img);
     track.appendChild(slide);
-
+  
+    // Dot
     const dot = document.createElement('div');
     dot.className = 'carousel-dot';
     dot.dataset.index = idx;
@@ -210,12 +219,14 @@ function setupCarouselControls(totalSlides) {
   if (prevBtn) prevBtn.onclick = (e) => { e.stopPropagation(); goToSlide(currentSlide - 1); };
   if (nextBtn) nextBtn.onclick = (e) => { e.stopPropagation(); goToSlide(currentSlide + 1); };
 
-  // Touch (mobile swipe)
+  // Touch (mobile swipe) - better reset
   track.addEventListener('touchstart', (e) => {
-    e.stopPropagation();
-    isDown = true;
-    startX = e.touches[0].clientX;
-  }, { passive: false });  // ← Changed to false for stopPropagation
+    if (!isDown) {  // Only start if not already swiping
+      e.stopPropagation();
+      isDown = true;
+      startX = e.touches[0].clientX;
+    }
+  }, { passive: false });
 
   track.addEventListener('touchmove', (e) => {
     if (!isDown) return;
@@ -224,20 +235,22 @@ function setupCarouselControls(totalSlides) {
     const diff = startX - x;
     if (Math.abs(diff) > 50) {
       goToSlide(currentSlide + (diff > 0 ? 1 : -1));
-      isDown = false;
+      isDown = false;  // ← CRITICAL: Reset immediately after slide
+      startX = 0;
     }
   }, { passive: false });
 
   track.addEventListener('touchend', (e) => {
     e.stopPropagation();
-    isDown = false;
+    isDown = false;  // Always reset on end
+    startX = 0;
   }, { passive: false });
 
   // Mouse wheel (desktop)
   track.addEventListener('wheel', (e) => {
     e.stopPropagation();
     e.preventDefault();
-    goToSlide(currentSlide + (e.deltaY > 0 ? 1 : - 1));
+    goToSlide(currentSlide + (e.deltaY > 0 ? 1 : -1));
   }, { passive: false });
 }
 
