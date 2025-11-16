@@ -1,2 +1,5 @@
 carts/*
 !carts/.gitkeep
+# Dynamic runtime files — never commit local copies
+data/status.json
+data/carts.json

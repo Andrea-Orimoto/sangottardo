@@ -1,4 +1,4 @@
-console.log("APP.JS LOADED SUCCESSFULLY");
+const IS_LOCAL = window.location.hostname === '127.0.0.1' || window.location.hostname === 'localhost';
 
 document.addEventListener('DOMContentLoaded', () => {
   console.log("DOM READY — CALLING INIT()");
@@ -41,6 +41,8 @@ async function init() {
     document.getElementById('grid').innerHTML = '<p class="text-center text-gray-500">No items found. Check data/items.csv</p>';
     return;
   }
+
+
   renderGrid();
   console.log('INIT: Grid rendered');
   setupFilters();
@@ -49,10 +51,10 @@ async function init() {
   document.getElementById('closeCart').onclick = () => toggleCart(false);
   document.getElementById('loadMore').onclick = () => renderGrid(true);
   document.getElementById('clearFilters').onclick = clearFilters;
+  // Restore admin state
+  const isAdmin = !!localStorage.getItem('adminToken');
   const adminLink = document.getElementById('adminLink');
-  if (adminLink && localStorage.getItem('adminToken')) {
-    adminLink.classList.remove('hidden');
-  }
+  if (adminLink) adminLink.classList.toggle('hidden', !isAdmin);
 
   async function loadCSVAndStatus() {
     try {
@@ -223,7 +225,7 @@ async function init() {
       // === STATUS BADGE & DROPDOWN (VISIBLE TO ALL) ===
       // === STATUS BADGE (NON-ADMIN) OR DROPDOWN (ADMIN) ===
       const isSold = (item.Status || '').trim() === 'Venduto';
-      const isAdmin = !!localStorage.getItem('adminToken');
+      const isAdmin = !!localStorage.getItem('adminToken'); // ONLY IF TOKEN
 
       let statusHtml;
       if (isAdmin) {
@@ -510,10 +512,10 @@ function checkAdminAccess() {
   if (!googleUser) return;
   const profile = googleUser.getBasicProfile();
   const email = profile.getEmail();
+  // After DOM loaded
   const adminLink = document.getElementById('adminLink');
-  if (admins.includes(email) && adminLink) {
-    adminLink.classList.remove('hidden');
-    console.log("ADMIN ACCESS GRANTED:", email);
+  if (adminLink) {
+    adminLink.classList.toggle('hidden', !localStorage.getItem('adminToken'));
   }
 }
 
@@ -552,4 +554,20 @@ function filterByStatus(value) {
   if (statusFilter) statusFilter.value = value;
   displayed = 0;
   renderGrid();
+}
+
+function onSignIn(googleUser) {
+  const profile = googleUser.getBasicProfile();
+  const email = profile.getEmail();
+
+  // Check if admin
+  fetch('data/admins.json')
+    .then(r => r.json())
+    .then(admins => {
+      if (admins.includes(email)) {
+        localStorage.setItem('adminToken', 'google-admin'); // SET TOKEN
+        document.getElementById('adminLink').classList.remove('hidden');
+        renderGrid(); // Refresh to show dropdown
+      }
+    });
 }

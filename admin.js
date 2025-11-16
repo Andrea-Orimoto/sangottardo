@@ -191,5 +191,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
   document.getElementById('refreshItems').onclick = loadItemsAndStatus;
   document.getElementById('refreshCarts').onclick = loadCarts;
-  document.getElementById('logout').onclick = () => { localStorage.clear(); location.href = 'index.html'; };
+  document.getElementById('logout').onclick = () => {
+    localStorage.removeItem('adminToken'); // CLEAR TOKEN
+    window.location.href = 'index.html';
+  };
 });
