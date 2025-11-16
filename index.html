@@ -62,32 +62,35 @@
     </main>
 
     <!-- ==================== MODAL ==================== -->
-    <!-- MODAL — STABILE, IMMAGINE GRANDE, CUORE -->
-    <div id="modal" class="fixed inset-0 bg-black/50 hidden flex items-center justify-center z-50 p-4 overflow-y-auto">
-        <div class="bg-white rounded-lg w-full max-w-2xl max-h-full flex flex-col overflow-hidden shadow-xl relative">
+<!-- MODAL — STABILE, NO GRAY, CUORE TOGGLE -->
+<div id="modal" class="fixed inset-0 bg-black bg-opacity-50 hidden flex items-center justify-center z-50 p-4">
+  <div class="bg-white rounded-lg w-full max-w-2xl max-h-full flex flex-col overflow-hidden shadow-xl relative">
+    
+    <!-- CLOSE BUTTON -->
+    <button id="closeModal" class="absolute top-4 right-4 w-10 h-10 flex items-center justify-center text-2xl text-gray-600 hover:text-gray-900 bg-white rounded-full shadow-md z-20 hover:shadow-lg transition">
+      ×
+    </button>
 
-            <!-- CLOSE BUTTON -->
-            <button id="closeModal"
-                class="absolute top-4 right-4 w-10 h-10 flex items-center justify-center text-2xl text-gray-600 hover:text-gray-900 bg-white rounded-full shadow-md z-20 hover:shadow-lg transition">
-                ×
-            </button>
+    <!-- SWIPER — 500px, STABILE -->
+    <div class="swiper mySwiper relative" style="height: 500px;">
+      <div id="swiperWrapper" class="swiper-wrapper"></div>
+      <div class="swiper-button-prev"></div>
+      <div class="swiper-button-next"></div>
+      <div class="swiper-pagination"></div>
 
-            <!-- SWIPER — 500px -->
-<div class="swiper mySwiper relative" style="height: 500px;">
-  <div id="swiperWrapper" class="swiper-wrapper"></div>
-  <div class="swiper-button-prev"></div>
-  <div class="swiper-button-next"></div>
-  <div class="swiper-pagination"></div>
-  <button id="modalHeartBtn" class="absolute top-4 left-4 w-10 h-10 bg-white rounded-full shadow-md flex items-center justify-center z-10 hover:shadow-lg transition"></button>
-</div>
-
-            <!-- INFO -->
-            <div class="p-6 space-y-4">
-                <h2 id="modalTitle" class="text-2xl font-bold"></h2>
-                <div id="modalDesc" class="text-sm space-y-1 max-h-40 overflow-y-auto"></div>
-            </div>
-        </div>
+      <!-- CUORE TOGGLE -->
+      <button id="modalHeartBtn" class="absolute top-4 left-4 w-10 h-10 bg-white rounded-full shadow-md flex items-center justify-center z-10 hover:shadow-lg transition">
+        <!-- SVG da JS -->
+      </button>
     </div>
+
+    <!-- INFO PANEL -->
+    <div class="p-6 space-y-4">
+      <h2 id="modalTitle" class="text-2xl font-bold"></h2>
+      <div id="modalDesc" class="text-sm space-y-1 max-h-40 overflow-y-auto"></div>
+    </div>
+  </div>
+</div>
 
     <!-- ==================== PREFERITI SIDEBAR ==================== -->
     <div id="preferitiSidebar"

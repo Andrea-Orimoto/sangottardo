@@ -197,7 +197,7 @@ function renderGrid(loadMore = false) {
    MODAL
    ======================================== */
 function openModal(item) {
-  // === 1. TITOLO + DESCRIZIONE ===
+  // === TITOLO + DESCRIZIONE ===
   document.getElementById('modalTitle').textContent = item.Item;
   document.getElementById('modalDesc').innerHTML = `
     <strong>Serial Number:</strong> ${item['Serial No'] || '—'}<br>
@@ -208,22 +208,19 @@ function openModal(item) {
     <strong>Price:</strong> ${formatPrice(item)}
   `;
 
-  // === 2. PULISCI E AGGIUNGI SLIDES ===
+  // === PULISCI SLIDES ===
   const wrapper = document.getElementById('swiperWrapper');
   wrapper.innerHTML = '';
+
+  // === AGGIUNGI SLIDE ===
   item.Photos.forEach((src, i) => {
     const slide = document.createElement('div');
     slide.className = 'swiper-slide flex items-center justify-center bg-gray-100';
-    const img = document.createElement('img');
-    img.src = `images/${src}`;
-    img.alt = `${item.Item} ${i+1}`;
-    img.className = 'max-w-full max-h-full object-contain';
-    img.onerror = () => img.src = 'images/placeholder.jpg';
-    slide.appendChild(img);
+    slide.innerHTML = `<img src="images/${src}" alt="${item.Item} ${i+1}" class="max-w-full max-h-full object-contain" onerror="this.src='images/placeholder.jpg'">`;
     wrapper.appendChild(slide);
   });
 
-  // === 3. CUORE TOGGLE ===
+  // === CUORE TOGGLE ===
   const heartBtn = document.getElementById('modalHeartBtn');
   const inPref = preferiti.some(p => p.UUID === item.UUID);
   heartBtn.innerHTML = inPref
@@ -234,39 +231,37 @@ function openModal(item) {
     togglePreferiti(item.UUID);
   };
 
-  // === 4. MOSTRA MODAL ===
-  const modal = document.getElementById('modal');
-  modal.classList.remove('hidden');
+  // === MOSTRA MODAL ===
+  document.getElementById('modal').classList.remove('hidden');
 
-  // === 5. INIT SWIPER DOPO REFLOW + IMMAGINI CARICATE ===
-  requestAnimationFrame(() => {
-    requestAnimationFrame(() => {
-      // Forza layout
-      void modal.offsetHeight;
+  // === INIT SWIPER DOPO REFLOW ===
+  setTimeout(() => {
+    // Forza reflow
+    const swiper = document.querySelector('.mySwiper');
+    void swiper.offsetHeight;
 
-      // Destroy old
-      if (window.modalSwiper) {
-        window.modalSwiper.destroy(true, true);
-        window.modalSwiper = null;
-      }
+    // Destroy old
+    if (window.modalSwiper) {
+      window.modalSwiper.destroy(true, true);
+      window.modalSwiper = null;
+    }
 
-      // Init new
-      window.modalSwiper = new Swiper('.mySwiper', {
-        loop: false,
-        pagination: { el: '.swiper-pagination', clickable: true },
-        navigation: { nextEl: '.swiper-button-next', prevEl: '.swiper-button-prev' },
-        spaceBetween: 0,
-        slidesPerView: 1,
-        touchRatio: 1,
-        grabCursor: true
-      });
-
-      // CRITICAL: Aggiorna tutto
-      window.modalSwiper.updateSize();
-      window.modalSwiper.updateSlides();
-      window.modalSwiper.update();
+    // Init new
+    window.modalSwiper = new Swiper('.mySwiper', {
+      loop: false,
+      pagination: { el: '.swiper-pagination', clickable: true },
+      navigation: { nextEl: '.swiper-button-next', prevEl: '.swiper-button-prev' },
+      spaceBetween: 0,
+      slidesPerView: 1,
+      touchRatio: 1,
+      grabCursor: true
     });
-  });
+
+    // Force update
+    window.modalSwiper.updateSize();
+    window.modalSwiper.updateSlides();
+    window.modalSwiper.update();
+  }, 100);
 
   document.getElementById('closeModal').onclick = closeModal;
 }
