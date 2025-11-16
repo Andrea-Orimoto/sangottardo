@@ -52,7 +52,7 @@ function renderItems() {
   tbody.innerHTML = allItems.map(item => {
     const uuid = item.UUID;
     const currentStatus = (statusData[uuid] || '').trim();
-    const displayStatus = currentStatus === '' || currentStatus === 'Attivo' ? 'Attivo' : currentStatus;
+    const displayStatus = currentStatus === '' || currentStatus === 'Attivo' || currentStatus === 'Disponibile' ? 'Attivo' : currentStatus;
 
     return `
       <tr class="border-b">
@@ -61,7 +61,7 @@ function renderItems() {
         <td class="px-4 py-2">€${item['Purchase Price'] || 'N/A'}</td>
         <td class="px-4 py-2">
           <select data-uuid="${uuid}" class="status-select p-1 border rounded text-sm">
-            <option value="Attivo" ${displayStatus === 'Attivo' ? 'selected' : ''}>Attivo</option>
+            <option value="Disponibile" ${displayStatus === 'Disponibile' ? 'selected' : ''}>Disponibile</option>
             <option value="Venduto" ${displayStatus === 'Venduto' ? 'selected' : ''}>Venduto</option>
           </select>
         </td>
@@ -123,7 +123,7 @@ function renderCarts() {
 
   container.innerHTML = carts.map((cart, i) => `
     <div class="border p-3 rounded">
-      <p class="font-semibold">#${i+1} — ${cart.userName} (${cart.userEmail})</p>
+      <p class="font-semibold">#${i + 1} — ${cart.userName} (${cart.userEmail})</p>
       <p class="text-xs text-gray-600">${new Date(cart.timestamp).toLocaleString()}</p>
       <div class="mt-2 text-sm">
         ${cart.items.map(it => `<div class="flex justify-between"><span>${it.Item}</span><span>€${it['Purchase Price']}</span></div>`).join('')}
@@ -133,7 +133,7 @@ function renderCarts() {
   `).join('');
 }
 
-window.deleteCart = async function(i) {
+window.deleteCart = async function (i) {
   if (!confirm('Delete this cart?')) return;
   carts.splice(i, 1);
   await saveCarts();

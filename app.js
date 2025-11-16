@@ -123,8 +123,7 @@ async function init() {
 
       // Normalize status
       const itemStatus = (item.Status || '').trim();
-      const normalizedStatus = itemStatus === '' || itemStatus === 'Attivo' ? 'Attivo' : itemStatus;
-
+      const normalizedStatus = itemStatus === '' || itemStatus === 'Attivo' || itemStatus === 'Disponibile' ? 'Disponibile' : itemStatus;
       const matchStatus = !statusFilter || normalizedStatus === statusFilter;
 
       return matchSearch && matchLocation && matchStatus;
@@ -163,7 +162,7 @@ async function init() {
     statusSel.className = 'ml-2 p-2 border rounded';
     statusSel.innerHTML = `
   <option value="">All Status</option>
-  <option value="Attivo">Attivo</option>
+  <option value="Attivo">Disponibile</option>
   <option value="Venduto">Venduto</option>
 `;
     const filtersDiv = document.querySelector('#filters');
@@ -234,18 +233,18 @@ async function init() {
 
       // === STATUS BADGE (OUTSIDE TEMPLATE STRING) ===
       const status = (item.Status || '').trim();
-      const displayStatus = status === '' || status === 'Attivo' ? 'Attivo' : status;
+      const displayStatus = status === '' || status === 'Attivo' || status === 'Disponibile' ? 'Disponibile' : status;
       const badge = displayStatus === 'Venduto'
         ? '<span class="bg-red-100 text-red-800 text-xs px-2 py-1 rounded">Venduto</span>'
-        : '<span class="bg-green-100 text-green-800 text-xs px-2 py-1 rounded">Attivo</span>';
+        : '<span class="bg-green-100 text-green-800 text-xs px-2 py-1 rounded">Disponibile</span>';
 
       // === ADMIN STATUS DROPDOWN (ONLY 2 OPTIONS) ===
       const adminStatusDropdown = localStorage.getItem('adminToken') ? `
-      <select id="status-${item.UUID}" class="absolute top-2 right-2 text-xs p-1 rounded border" onchange="saveStatus('${item.UUID}', this.value)">
-        <option value="Attivo" ${displayStatus === 'Attivo' ? 'selected' : ''}>Attivo</option>
-        <option value="Venduto" ${displayStatus === 'Venduto' ? 'selected' : ''}>Venduto</option>
-      </select>
-    ` : '';
+        <select id="status-${item.UUID}" class="absolute top-2 right-2 text-xs p-1 rounded border" onchange="saveStatus()"">
+          <option value="Disponibile" ${displayStatus === 'Disponibile' ? 'selected' : ''}>Disponibile</option>
+          <option value="Venduto" ${displayStatus === 'Venduto' ? 'selected' : ''}>Venduto</option>
+        </select>
+      ` : '';
 
       // === PHOTO COUNT BADGE ===
       const photoCountBadge = item.Photos.length > 1 ? `
@@ -432,23 +431,50 @@ async function init() {
       saveCartToDrive();
     }
   }
+// Admin: Save Status (Bulk)
+async function saveStatus() {
+  if (!localStorage.getItem('adminToken')) return;
 
-  // Admin: Save Status
-  async function saveStatus() {
-    if (!localStorage.getItem('adminToken')) return;
-    const statusObj = {};
-    allItems.forEach(item => {
-      const select = document.getElementById(`status-${item.UUID}`);
-      if (select) statusObj[item.UUID] = select.value;
-    });
+  const statusObj = {};
+  allItems.forEach(item => {
+    const select = document.getElementById(`status-${item.UUID}`);
+    if (select) {
+      const value = select.value;
+      // Save blank for Disponibile
+      statusObj[item.UUID] = value === 'Disponibile' ? '' : value;
+    }
+  });
+
+  try {
     const content = btoa(JSON.stringify(statusObj, null, 2));
     const sha = await getFileSha('data/status.json');
+
     await fetch(`https://api.github.com/repos/${REPO}/contents/data/status.json`, {
       method: 'PUT',
-      headers: { Authorization: `token ${GITHUB_TOKEN}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ message: 'Update status', content, sha })
+      headers: { 
+        'Authorization': `token ${GITHUB_TOKEN}`, 
+        'Content-Type': 'application/json' 
+      },
+      body: JSON.stringify({ 
+        message: 'Update status (bulk)', 
+        content, 
+        sha 
+      })
     });
+
+    // Update in-memory items
+    allItems.forEach(item => {
+      const saved = statusObj[item.UUID];
+      if (saved !== undefined) {
+        item.Status = saved;
+      }
+    });
+
+    renderGrid(); // Refresh UI
+  } catch (e) {
+    alert('Failed to save status: ' + e.message);
   }
+}
 
   async function getFileSha(path) {
     try {
