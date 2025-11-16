@@ -14,10 +14,15 @@ const ADMIN_PASSWORD_HASH = '6972cf16a98ceb52957e425cdf7dc642eca2e97cc1aef848f53
 const PAGE_SIZE = 12;
 let allItems = [], displayed = 0;
 let cart = [];
+window.statusData = {}; // ADD THIS LINE
 
 // Use global googleUser from index.html
 
 async function init() {
+
+  // TEMP: FORCE ADMIN (REMOVE LATER)
+  localStorage.setItem('adminToken', 'debug-admin');
+
   console.log('INIT: Starting...');
   try {
     await loadCSVAndStatus();
@@ -50,20 +55,11 @@ async function init() {
   }
 
   async function loadCSVAndStatus() {
-    console.log("LOAD: Fetching data/items.csv...");
     try {
+      // Load items.csv
       const resp = await fetch('data/items.csv');
-      if (!resp.ok) throw new Error(`HTTP ${resp.status} - Check path`);
-
       const text = await resp.text();
-      console.log("CSV loaded:", text.length, "chars");
-      if (!text.trim()) throw new Error("CSV is empty");
-
       const parsed = Papa.parse(text, { header: true, skipEmptyLines: true });
-      if (parsed.errors.length > 0) {
-        console.error("CSV Parse Errors:", parsed.errors);
-        throw new Error("CSV parsing failed");
-      }
 
       const map = new Map();
       parsed.data.forEach(row => {
@@ -75,26 +71,23 @@ async function init() {
       });
 
       allItems = Array.from(map.values());
-      console.log("PARSED ITEMS:", allItems.length);
 
-      // === LOAD STATUS.JSON (SAFE) ===
+      // Load status.json (only Venduto items)
       try {
         const statusResp = await fetch('data/status.json');
         if (statusResp.ok) {
           const statusData = await statusResp.json();
           allItems.forEach(item => {
-            const saved = statusData[item.UUID];
-            item.Status = saved === undefined ? '' : saved;
+            item.Status = statusData[item.UUID] || ''; // blank = Disponibile
           });
         }
       } catch (e) {
-        console.warn("No status.json found — using defaults");
+        console.warn("No status.json — all items Disponibile");
       }
 
     } catch (e) {
-      console.error("FATAL CSV ERROR:", e);
+      console.error("Load failed:", e);
       allItems = [];
-      throw e; // Let init() show error
     }
   }
 
@@ -107,24 +100,17 @@ async function init() {
   function filterItems() {
     const q = (document.getElementById('search').value || '').toLowerCase().trim();
     const locFilter = document.getElementById('catFilter').value;
-    const statusFilterEl = document.getElementById('statusFilter');
-    const statusFilter = statusFilterEl ? statusFilterEl.value : '';
+    const statusFilter = document.getElementById('statusFilter')?.value || '';
 
     return allItems.filter(item => {
-      const searchText = [
-        item.Item,
-        item.Location || '',
-        item.Categories || '',
-        item.Notes || ''
-      ].join(' ').toLowerCase();
-
+      const searchText = [item.Item, item.Location, item.Categories, item.Notes].join(' ').toLowerCase();
       const matchSearch = !q || searchText.includes(q);
-      const matchLocation = !locFilter || (item.Location || '').trim() === locFilter;
+      const matchLocation = !locFilter || (item.Location || '') === locFilter;
 
-      // Normalize status
-      const itemStatus = (item.Status || '').trim();
-      const normalizedStatus = itemStatus === '' || itemStatus === 'Attivo' || itemStatus === 'Disponibile' ? 'Disponibile' : itemStatus;
-      const matchStatus = !statusFilter || normalizedStatus === statusFilter;
+      const isSold = (item.Status || '').trim() === 'Venduto';
+      const matchStatus = !statusFilter ||
+        (statusFilter === 'Disponibile' && !isSold) ||
+        (statusFilter === 'Venduto' && isSold);
 
       return matchSearch && matchLocation && matchStatus;
     });
@@ -156,15 +142,18 @@ async function init() {
       sel.appendChild(opt);
     });
 
-    // Status filter — ONLY Attivo / Venduto
+    // === STATUS FILTER (TOP BAR) ===
     const statusSel = document.createElement('select');
     statusSel.id = 'statusFilter';
     statusSel.className = 'ml-2 p-2 border rounded';
     statusSel.innerHTML = `
-  <option value="">All Status</option>
-  <option value="Attivo">Disponibile</option>
-  <option value="Venduto">Venduto</option>
-`;
+      <option value="">All Status</option>
+      <option value="Disponibile">Disponibile</option>
+      <option value="Venduto">Venduto</option>
+    `;
+    statusSel.addEventListener('change', () => { displayed = 0; renderGrid(); });
+    document.querySelector('#filters').appendChild(statusSel);
+
     const filtersDiv = document.querySelector('#filters');
     if (filtersDiv) filtersDiv.appendChild(statusSel);
 
@@ -190,7 +179,7 @@ async function init() {
     });
 
     // === Status change ===
-    statusSel.addEventListener('change', () => { displayed = 0; renderGrid(); });
+    statusSel.addEventListener('change', () => { displayed = 0; renderGrid(); saveStatus(); });
 
     // === URL ?cat= pre-select ===
     const urlParams = new URLSearchParams(window.location.search);
@@ -231,20 +220,26 @@ async function init() {
       const div = document.createElement('div');
       div.className = 'bg-white rounded overflow-hidden shadow cursor-pointer hover:shadow-lg transition-shadow';
 
-      // === STATUS BADGE (OUTSIDE TEMPLATE STRING) ===
-      const status = (item.Status || '').trim();
-      const displayStatus = status === '' || status === 'Attivo' || status === 'Disponibile' ? 'Disponibile' : status;
-      const badge = displayStatus === 'Venduto'
-        ? '<span class="bg-red-100 text-red-800 text-xs px-2 py-1 rounded">Venduto</span>'
-        : '<span class="bg-green-100 text-green-800 text-xs px-2 py-1 rounded">Disponibile</span>';
+      // === STATUS BADGE & DROPDOWN (VISIBLE TO ALL) ===
+      // === STATUS BADGE (NON-ADMIN) OR DROPDOWN (ADMIN) ===
+      const isSold = (item.Status || '').trim() === 'Venduto';
+      const isAdmin = !!localStorage.getItem('adminToken');
 
-      // === ADMIN STATUS DROPDOWN (ONLY 2 OPTIONS) ===
-      const adminStatusDropdown = localStorage.getItem('adminToken') ? `
-        <select id="status-${item.UUID}" class="absolute top-2 right-2 text-xs p-1 rounded border" onchange="saveStatus()"">
-          <option value="Disponibile" ${displayStatus === 'Disponibile' ? 'selected' : ''}>Disponibile</option>
-          <option value="Venduto" ${displayStatus === 'Venduto' ? 'selected' : ''}>Venduto</option>
+      let statusHtml;
+      if (isAdmin) {
+        statusHtml = `
+        <select class="text-xs p-1 rounded border bg-white" 
+                onchange="saveStatus('${item.UUID}', this.value)"
+                onclick="event.stopPropagation();">
+          <option value="Disponibile" ${!isSold ? 'selected' : ''}>Disponibile</option>
+          <option value="Venduto" ${isSold ? 'selected' : ''}>Venduto</option>
         </select>
-      ` : '';
+      `;
+      } else {
+        statusHtml = isSold
+          ? '<span class="bg-red-100 text-red-800 text-xs px-2 py-1 rounded">Venduto</span>'
+          : '<span class="bg-green-100 text-green-800 text-xs px-2 py-1 rounded">Disponibile</span>';
+      }
 
       // === PHOTO COUNT BADGE ===
       const photoCountBadge = item.Photos.length > 1 ? `
@@ -259,9 +254,10 @@ async function init() {
       // === CARD HTML ===
       div.innerHTML = `
       <div class="bg-gray-100 flex items-center justify-center rounded-t-lg h-48 relative overflow-hidden">
-        <img src="images/${item.Photos[0]}" alt="${item.Item}" class="max-h-full max-w-full object-contain transition-transform hover:scale-105" onerror="this.src='images/placeholder.jpg'">
+        <img src="images/${item.Photos[0]}" alt="${item.Item}" 
+            class="max-h-full max-w-full object-contain transition-transform hover:scale-105" 
+            onerror="this.src='images/placeholder.jpg'">
         ${photoCountBadge}
-        ${adminStatusDropdown}
       </div>
       <div class="p-3 h-32 flex flex-col justify-between bg-white">
         <div>
@@ -271,7 +267,7 @@ async function init() {
         </div>
         <div class="flex justify-between items-center">
           <p class="text-sm font-medium text-indigo-600">Price: ${formatPrice(item)}</p>
-          <div class="mt-1">${badge}</div>
+          <div class="mt-1">${statusHtml}</div>
         </div>
       </div>
     `;
@@ -431,50 +427,44 @@ async function init() {
       saveCartToDrive();
     }
   }
-// Admin: Save Status (Bulk)
-async function saveStatus() {
-  if (!localStorage.getItem('adminToken')) return;
 
-  const statusObj = {};
-  allItems.forEach(item => {
-    const select = document.getElementById(`status-${item.UUID}`);
-    if (select) {
-      const value = select.value;
-      // Save blank for Disponibile
-      statusObj[item.UUID] = value === 'Disponibile' ? '' : value;
+  async function saveStatus(uuid, value) {
+    if (!localStorage.getItem('adminToken')) {
+      alert('Only admins can change status');
+      renderGrid();
+      return;
     }
-  });
 
-  try {
-    const content = btoa(JSON.stringify(statusObj, null, 2));
-    const sha = await getFileSha('data/status.json');
+    const saveValue = value === 'Disponibile' ? '' : 'Venduto';
 
-    await fetch(`https://api.github.com/repos/${REPO}/contents/data/status.json`, {
-      method: 'PUT',
-      headers: { 
-        'Authorization': `token ${GITHUB_TOKEN}`, 
-        'Content-Type': 'application/json' 
-      },
-      body: JSON.stringify({ 
-        message: 'Update status (bulk)', 
-        content, 
-        sha 
-      })
-    });
+    try {
+      const resp = await fetch('data/status.json');
+      const current = resp.ok ? await resp.json() : {};
 
-    // Update in-memory items
-    allItems.forEach(item => {
-      const saved = statusObj[item.UUID];
-      if (saved !== undefined) {
-        item.Status = saved;
+      if (saveValue === '') {
+        delete current[uuid]; // Remove from status.json if Disponibile
+      } else {
+        current[uuid] = saveValue;
       }
-    });
 
-    renderGrid(); // Refresh UI
-  } catch (e) {
-    alert('Failed to save status: ' + e.message);
+      const content = btoa(JSON.stringify(current, null, 2));
+      const sha = await getFileSha('data/status.json');
+
+      await fetch(`https://api.github.com/repos/${REPO}/contents/data/status.json`, {
+        method: 'PUT',
+        headers: { 'Authorization': `token ${GITHUB_TOKEN}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: `Status: ${uuid} → ${value}`, content, sha })
+      });
+
+      const item = allItems.find(i => i.UUID === uuid);
+      if (item) item.Status = saveValue;
+
+      renderGrid();
+      console.log(`SAVED: ${uuid} → ${value}`);
+    } catch (e) {
+      alert('Save failed');
+    }
   }
-}
 
   async function getFileSha(path) {
     try {
@@ -555,4 +545,11 @@ async function saveStatus(uuid, newStatus) {
   } catch (e) {
     alert('Failed to save status: ' + e.message);
   }
+}
+
+function filterByStatus(value) {
+  const statusFilter = document.getElementById('statusFilter');
+  if (statusFilter) statusFilter.value = value;
+  displayed = 0;
+  renderGrid();
 }
