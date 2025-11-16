@@ -208,13 +208,18 @@ function openModal(item) {
     <strong>Price:</strong> ${formatPrice(item)}
   `;
 
-  // === 2. PULISCI SLIDES ===
+  // === 2. PULISCI E AGGIUNGI SLIDES ===
   const wrapper = document.getElementById('swiperWrapper');
   wrapper.innerHTML = '';
   item.Photos.forEach((src, i) => {
     const slide = document.createElement('div');
     slide.className = 'swiper-slide flex items-center justify-center bg-gray-100';
-    slide.innerHTML = `<img src="images/${src}" alt="${item.Item} ${i+1}" class="max-w-full max-h-full object-contain" onerror="this.src='images/placeholder.jpg'">`;
+    const img = document.createElement('img');
+    img.src = `images/${src}`;
+    img.alt = `${item.Item} ${i+1}`;
+    img.className = 'max-w-full max-h-full object-contain';
+    img.onerror = () => img.src = 'images/placeholder.jpg';
+    slide.appendChild(img);
     wrapper.appendChild(slide);
   });
 
@@ -229,14 +234,14 @@ function openModal(item) {
     togglePreferiti(item.UUID);
   };
 
-  // === 4. MOSTRA MODAL (senza Swiper visibile) ===
+  // === 4. MOSTRA MODAL ===
   const modal = document.getElementById('modal');
   modal.classList.remove('hidden');
 
-  // === 5. INIT SWIPER DOPO REFLOW + AGGIUNGI CLASSE READY ===
+  // === 5. INIT SWIPER DOPO REFLOW + IMMAGINI CARICATE ===
   requestAnimationFrame(() => {
     requestAnimationFrame(() => {
-      // Forza reflow
+      // Forza layout
       void modal.offsetHeight;
 
       // Destroy old
@@ -256,10 +261,10 @@ function openModal(item) {
         grabCursor: true
       });
 
+      // CRITICAL: Aggiorna tutto
+      window.modalSwiper.updateSize();
+      window.modalSwiper.updateSlides();
       window.modalSwiper.update();
-
-      // MOSTRA SWIPER CON TRANSIZIONE
-      document.querySelector('.mySwiper').classList.add('swiper-ready');
     });
   });
 
@@ -268,8 +273,6 @@ function openModal(item) {
 
 function closeModal() {
   document.getElementById('modal').classList.add('hidden');
-  const swiper = document.querySelector('.mySwiper');
-  if (swiper) swiper.classList.remove('swiper-ready');
   if (window.modalSwiper) {
     window.modalSwiper.destroy(true, true);
     window.modalSwiper = null;
