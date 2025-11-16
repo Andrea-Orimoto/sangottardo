@@ -19,8 +19,17 @@ let cart = [];
 
 async function init() {
   console.log('INIT: Starting...');
-  await loadCSVAndStatus();
-  console.log("INIT: Items loaded →", allItems.length);
+  try {
+    await loadCSVAndStatus();
+    console.log("INIT: Items loaded →", allItems.length);
+  } catch (e) {
+    console.error("INIT FAILED:", e);
+    const grid = document.getElementById('grid');
+    if (grid) {
+      grid.innerHTML = '<p class="text-red-600 col-span-full">Failed to load items: Check console (F12)</p>';
+    }
+    return;
+  }
   await loadAdmins();
   if (allItems.length === 0) {
     console.warn("NO ITEMS — CHECK CSV");
@@ -41,25 +50,19 @@ async function init() {
   }
 
   async function loadCSVAndStatus() {
-    console.log("LOAD: Trying to fetch data/items.csv...");
+    console.log("LOAD: Fetching data/items.csv...");
     try {
       const resp = await fetch('data/items.csv');
-      if (!resp.ok) {
-        console.error("CSV 404! Status:", resp.status);
-        allItems = [];
-        return;
-      }
+      if (!resp.ok) throw new Error(`HTTP ${resp.status} - Check path`);
+
       const text = await resp.text();
-      console.log("CSV loaded! Length:", text.length, "chars");
-      if (text.trim() === '') {
-        console.error("CSV is empty!");
-        allItems = [];
-        return;
-      }
+      console.log("CSV loaded:", text.length, "chars");
+      if (!text.trim()) throw new Error("CSV is empty");
+
       const parsed = Papa.parse(text, { header: true, skipEmptyLines: true });
-      console.log("Papa.parse result: rows =", parsed.data.length);
       if (parsed.errors.length > 0) {
-        console.error("CSV PARSE ERRORS:", parsed.errors);
+        console.error("CSV Parse Errors:", parsed.errors);
+        throw new Error("CSV parsing failed");
       }
 
       const map = new Map();
@@ -71,24 +74,27 @@ async function init() {
         if (photos.length) map.get(uuid).Photos.push(...photos);
       });
 
-      // TEMP FIX: Show all items
       allItems = Array.from(map.values());
-      console.log("ALL ITEMS LOADED:", allItems.length);
-      console.log("SAMPLE PHOTOS:", allItems[0]?.Photos);
+      console.log("PARSED ITEMS:", allItems.length);
 
-      // Load status
+      // === LOAD STATUS.JSON (SAFE) ===
       try {
         const statusResp = await fetch('data/status.json');
-        const statusData = await statusResp.json();
-        allItems.forEach(item => {
-          item.Status = statusData[item.UUID] || 'Attivo';
-        });
+        if (statusResp.ok) {
+          const statusData = await statusResp.json();
+          allItems.forEach(item => {
+            const saved = statusData[item.UUID];
+            item.Status = saved === undefined ? '' : saved;
+          });
+        }
       } catch (e) {
-        allItems.forEach(item => item.Status = 'Attivo');
+        console.warn("No status.json found — using defaults");
       }
+
     } catch (e) {
       console.error("FATAL CSV ERROR:", e);
       allItems = [];
+      throw e; // Let init() show error
     }
   }
 
@@ -105,90 +111,101 @@ async function init() {
     const statusFilter = statusFilterEl ? statusFilterEl.value : '';
 
     return allItems.filter(item => {
-      const searchText = (item.Item + ' ' + (item.Location || '') + ' ' + (item.Categories || '') + ' ' + (item.Notes || '')).toLowerCase();
+      const searchText = [
+        item.Item,
+        item.Location || '',
+        item.Categories || '',
+        item.Notes || ''
+      ].join(' ').toLowerCase();
+
       const matchSearch = !q || searchText.includes(q);
       const matchLocation = !locFilter || (item.Location || '').trim() === locFilter;
-      const matchStatus = !statusFilter || item.Status === statusFilter;
+
+      // Normalize status
+      const itemStatus = (item.Status || '').trim();
+      const normalizedStatus = itemStatus === '' || itemStatus === 'Attivo' ? 'Attivo' : itemStatus;
+
+      const matchStatus = !statusFilter || normalizedStatus === statusFilter;
+
       return matchSearch && matchLocation && matchStatus;
     });
   }
 
   function setupFilters() {
-  const sel = document.getElementById('catFilter');
-  const totalItems = allItems.length;
+    const sel = document.getElementById('catFilter');
+    const totalItems = allItems.length;
 
-  // === ONE "All Categories" ONLY ===
-  sel.innerHTML = '';
-  const allOption = document.createElement('option');
-  allOption.value = '';
-  allOption.textContent = `All Categories (${totalItems})`;
-  sel.appendChild(allOption);
+    // === ONE "All Categories" ONLY ===
+    sel.innerHTML = '';
+    const allOption = document.createElement('option');
+    allOption.value = '';
+    allOption.textContent = `All Categories (${totalItems})`;
+    sel.appendChild(allOption);
 
-  // === Real categories ===
-  const locations = [...new Set(allItems.map(i => i.Location).filter(Boolean))].sort();
-  const locationCount = {};
-  allItems.forEach(item => {
-    const loc = item.Location || 'Uncategorized';
-    locationCount[loc] = (locationCount[loc] || 0) + 1;
-  });
+    // === Real categories ===
+    const locations = [...new Set(allItems.map(i => i.Location).filter(Boolean))].sort();
+    const locationCount = {};
+    allItems.forEach(item => {
+      const loc = item.Location || 'Uncategorized';
+      locationCount[loc] = (locationCount[loc] || 0) + 1;
+    });
 
-  locations.forEach(loc => {
-    const opt = document.createElement('option');
-    opt.value = loc;
-    opt.textContent = `${loc} (${locationCount[loc]})`;
-    sel.appendChild(opt);
-  });
+    locations.forEach(loc => {
+      const opt = document.createElement('option');
+      opt.value = loc;
+      opt.textContent = `${loc} (${locationCount[loc]})`;
+      sel.appendChild(opt);
+    });
 
-  // === Status filter ===
-  const statusSel = document.createElement('select');
-  statusSel.id = 'statusFilter';
-  statusSel.className = 'ml-2 p-2 border rounded';
-  statusSel.innerHTML = `
-    <option value="">All Status</option>
-    <option value="Attivo">Attivo</option>
-    <option value="Venduto">Venduto</option>
-    <option value="Prenotato">Prenotato</option>
-  `;
-  const filtersDiv = document.querySelector('#filters');
-  if (filtersDiv) filtersDiv.appendChild(statusSel);
+    // Status filter — ONLY Attivo / Venduto
+    const statusSel = document.createElement('select');
+    statusSel.id = 'statusFilter';
+    statusSel.className = 'ml-2 p-2 border rounded';
+    statusSel.innerHTML = `
+  <option value="">All Status</option>
+  <option value="Attivo">Attivo</option>
+  <option value="Venduto">Venduto</option>
+`;
+    const filtersDiv = document.querySelector('#filters');
+    if (filtersDiv) filtersDiv.appendChild(statusSel);
 
-  // === Search ===
-  let timeout;
-  document.getElementById('search').addEventListener('input', () => {
-    clearTimeout(timeout);
-    timeout = setTimeout(() => { displayed = 0; renderGrid(); }, 300);
-  });
+    // === Search ===
+    let timeout;
+    document.getElementById('search').addEventListener('input', () => {
+      clearTimeout(timeout);
+      timeout = setTimeout(() => { displayed = 0; renderGrid(); }, 300);
+    });
 
-  // === Category change + URL update ===
-  sel.addEventListener('change', () => {
-    displayed = 0;
-    renderGrid();
-    const url = new URL(window.location);
-    const val = sel.value;
-    if (val) {
-      url.searchParams.set('cat', val);
-    } else {
-      url.searchParams.delete('cat');
-    }
-    window.history.replaceState({}, '', url);
-  });
-
-  // === Status change ===
-  statusSel.addEventListener('change', () => { displayed = 0; renderGrid(); });
-
-  // === URL ?cat= pre-select ===
-  const urlParams = new URLSearchParams(window.location.search);
-  const urlCat = urlParams.get('cat');
-  if (urlCat) {
-    setTimeout(() => {
-      const option = sel.querySelector(`option[value="${urlCat}"]`);
-      if (option) {
-        sel.value = urlCat;
-        sel.dispatchEvent(new Event('change'));
+    // === Category change + URL update ===
+    sel.addEventListener('change', () => {
+      displayed = 0;
+      renderGrid();
+      const url = new URL(window.location);
+      const val = sel.value;
+      if (val) {
+        url.searchParams.set('cat', val);
+      } else {
+        url.searchParams.delete('cat');
       }
-    }, 100);
+      window.history.replaceState({}, '', url);
+    });
+
+    // === Status change ===
+    statusSel.addEventListener('change', () => { displayed = 0; renderGrid(); });
+
+    // === URL ?cat= pre-select ===
+    const urlParams = new URLSearchParams(window.location.search);
+    const urlCat = urlParams.get('cat');
+    if (urlCat) {
+      setTimeout(() => {
+        const option = sel.querySelector(`option[value="${urlCat}"]`);
+        if (option) {
+          sel.value = urlCat;
+          sel.dispatchEvent(new Event('change'));
+        }
+      }, 100);
+    }
   }
-}
 
   function clearFilters() {
     document.getElementById('search').value = '';
@@ -199,28 +216,53 @@ async function init() {
   }
 
   function renderGrid(loadMore = false) {
-    if (!loadMore) { document.getElementById('grid').innerHTML = ''; displayed = 0; }
+    if (!loadMore) {
+      document.getElementById('grid').innerHTML = '';
+      displayed = 0;
+    }
+
     const container = document.getElementById('grid');
     const fragment = document.createDocumentFragment();
     const filtered = filterItems();
     const start = displayed;
     const end = Math.min(start + PAGE_SIZE, filtered.length);
+
     for (let i = start; i < end; i++) {
       const item = filtered[i];
       const div = document.createElement('div');
       div.className = 'bg-white rounded overflow-hidden shadow cursor-pointer hover:shadow-lg transition-shadow';
+
+      // === STATUS BADGE (OUTSIDE TEMPLATE STRING) ===
+      const status = (item.Status || '').trim();
+      const displayStatus = status === '' || status === 'Attivo' ? 'Attivo' : status;
+      const badge = displayStatus === 'Venduto'
+        ? '<span class="bg-red-100 text-red-800 text-xs px-2 py-1 rounded">Venduto</span>'
+        : '<span class="bg-green-100 text-green-800 text-xs px-2 py-1 rounded">Attivo</span>';
+
+      // === ADMIN STATUS DROPDOWN (ONLY 2 OPTIONS) ===
+      const adminStatusDropdown = localStorage.getItem('adminToken') ? `
+      <select id="status-${item.UUID}" class="absolute top-2 right-2 text-xs p-1 rounded border" onchange="saveStatus('${item.UUID}', this.value)">
+        <option value="Attivo" ${displayStatus === 'Attivo' ? 'selected' : ''}>Attivo</option>
+        <option value="Venduto" ${displayStatus === 'Venduto' ? 'selected' : ''}>Venduto</option>
+      </select>
+    ` : '';
+
+      // === PHOTO COUNT BADGE ===
+      const photoCountBadge = item.Photos.length > 1 ? `
+      <div class="absolute bottom-2 right-2 bg-black bg-opacity-70 text-white text-xs px-2 py-1 rounded-full flex items-center gap-1">
+        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+        </svg>
+        <span>${item.Photos.length}</span>
+      </div>
+    ` : '';
+
+      // === CARD HTML ===
       div.innerHTML = `
       <div class="bg-gray-100 flex items-center justify-center rounded-t-lg h-48 relative overflow-hidden">
         <img src="images/${item.Photos[0]}" alt="${item.Item}" class="max-h-full max-w-full object-contain transition-transform hover:scale-105" onerror="this.src='images/placeholder.jpg'">
-        ${item.Photos.length > 1 ? `<div class="absolute bottom-2 right-2 bg-black bg-opacity-70 text-white text-xs px-2 py-1 rounded-full flex items-center gap-1"><svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg><span>${item.Photos.length}</span></div>` : ''}
-        ${item.Status !== 'Attivo' ? `<div class="absolute top-2 left-2 px-2 py-1 text-xs font-bold rounded text-white ${item.Status === 'Venduto' ? 'bg-red-600' : 'bg-yellow-600'}">${item.Status}</div>` : ''}
-        ${localStorage.getItem('adminToken') ? `
-          <select id="status-${item.UUID}" class="absolute top-2 right-2 text-xs p-1 rounded border" onchange="saveStatus()">
-            <option value="Attivo" ${item.Status === 'Attivo' ? 'selected' : ''}>Attivo</option>
-            <option value="Venduto" ${item.Status === 'Venduto' ? 'selected' : ''}>Venduto</option>
-            <option value="Prenotato" ${item.Status === 'Prenotato' ? 'selected' : ''}>Prenotato</option>
-          </select>
-        ` : ''}
+        ${photoCountBadge}
+        ${adminStatusDropdown}
       </div>
       <div class="p-3 h-32 flex flex-col justify-between bg-white">
         <div>
@@ -228,11 +270,17 @@ async function init() {
           <p class="text-xs text-gray-600 mt-1">Category: ${item.Location || '—'}</p>
           <p class="text-xs text-gray-500">Serial: ${item['Serial No'] || '—'}</p>
         </div>
-        <p class="text-sm font-medium text-indigo-600">Price: ${formatPrice(item)}</p>
-      </div>`;
+        <div class="flex justify-between items-center">
+          <p class="text-sm font-medium text-indigo-600">Price: ${formatPrice(item)}</p>
+          <div class="mt-1">${badge}</div>
+        </div>
+      </div>
+    `;
+
       div.onclick = () => openModal(item);
       fragment.appendChild(div);
     }
+
     container.appendChild(fragment);
     displayed = end;
     document.getElementById('loadMore').classList.toggle('hidden', displayed >= filtered.length);
@@ -450,5 +498,35 @@ function checkAdminAccess() {
   if (admins.includes(email) && adminLink) {
     adminLink.classList.remove('hidden');
     console.log("ADMIN ACCESS GRANTED:", email);
+  }
+}
+
+async function saveStatus(uuid, newStatus) {
+  const saveValue = newStatus === 'Attivo' ? '' : newStatus;
+  try {
+    const resp = await fetch('data/status.json');
+    const data = resp.ok ? await resp.json() : {};
+    data[uuid] = saveValue;
+
+    await fetch(`https://api.github.com/repos/${REPO}/contents/data/status.json`, {
+      method: 'PUT',
+      headers: {
+        'Authorization': `token ${GITHUB_TOKEN}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        message: `Status: ${uuid} → ${newStatus}`,
+        content: btoa(JSON.stringify(data, null, 2)),
+        sha: await getFileSha('data/status.json')
+      })
+    });
+
+    // Update item in memory
+    const item = allItems.find(i => i.UUID === uuid);
+    if (item) item.Status = saveValue;
+
+    renderGrid(); // Refresh grid
+  } catch (e) {
+    alert('Failed to save status: ' + e.message);
   }
 }

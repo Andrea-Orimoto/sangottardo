@@ -1,111 +1,60 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
-  <meta charset="UTF-8">
-  <title>Admin Panel</title>
-  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+  <meta charset="UTF-8" />
+  <title>Sangottardo Admin</title>
+  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet" />
 </head>
-
 <body class="bg-gray-100 p-4">
   <div class="container mx-auto max-w-6xl">
     <div class="flex justify-between items-center mb-6">
-      <h1 class="text-2xl font-bold">Admin Panel</h1>
-      <button id="logout" class="bg-red-600 text-white px-4 py-2 rounded">Logout</button>
-      <div class="mt-6">
-        <h3 class="text-lg font-semibold mb-2">Add Admin</h3>
-        <div class="flex gap-2">
-          <input type="email" id="newAdminEmail" placeholder="new.admin@gmail.com" class="p-2 border rounded flex-1">
-          <button id="addAdminBtn" class="bg-green-600 text-white px-4 py-2 rounded">Add</button>
-        </div>
-        <p id="adminMsg" class="mt-2 text-sm"></p>
+      <h1 class="text-2xl font-bold text-indigo-700">Sangottardo Admin</h1>
+      <div class="flex items-center gap-3">
+        <div id="userInfo" class="text-sm text-gray-600"></div>
+        <button id="logout" class="bg-red-600 text-white px-4 py-2 rounded text-sm">Logout</button>
       </div>
     </div>
 
-    <div class="grid md:grid-cols-2 gap-6">
-      <!-- Carts -->
-      <div class="bg-white p-4 rounded shadow">
-        <h2 class="text-xl mb-3">Saved Carts</h2>
-        <button id="refreshCarts" class="mb-2 bg-gray-600 text-white px-3 py-1 rounded text-sm">Refresh</button>
-        <div id="cartsList" class="space-y-2 max-h-96 overflow-y-auto"></div>
+    <!-- Add Admin -->
+    <div class="bg-white p-4 rounded shadow mb-6">
+      <h3 class="text-lg font-semibold mb-2">Add Admin</h3>
+      <div class="flex gap-2">
+        <input type="email" id="newAdminEmail" placeholder="new.admin@gmail.com" class="p-2 border rounded flex-1">
+        <button id="addAdminBtn" class="bg-green-600 text-white px-4 py-2 rounded">Add</button>
       </div>
+      <p id="adminMsg" class="mt-2 text-sm"></p>
+    </div>
 
-      <!-- CSV Editor -->
-      <div class="bg-white p-4 rounded shadow">
-        <h2 class="text-xl mb-3">Edit items.csv</h2>
-        <textarea id="csvEditor" class="w-full h-96 font-mono text-xs p-2 border"
-          placeholder="Loading..."></textarea><br>
-        <button id="saveCsv" class="mt-2 bg-green-600 text-white px-4 py-2 rounded">Save & Commit</button>
-        <p id="csvMsg" class="mt-2 text-sm"></p>
+    <!-- Items Table -->
+    <div class="bg-white p-4 rounded shadow">
+      <h2 class="text-xl mb-3">Items & Status</h2>
+      <div class="mb-3">
+        <button id="refreshItems" class="bg-gray-600 text-white px-3 py-1 rounded text-sm">Refresh</button>
       </div>
+      <div id="itemsTable" class="overflow-x-auto">
+        <table class="min-w-full table-auto text-sm">
+          <thead class="bg-gray-50">
+            <tr>
+              <th class="px-4 py-2 text-left">Item</th>
+              <th class="px-4 py-2 text-left">Location</th>
+              <th class="px-4 py-2 text-left">Price</th>
+              <th class="px-4 py-2 text-left">Status</th>
+            </tr>
+          </thead>
+          <tbody id="itemsBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Saved Carts -->
+    <div class="bg-white p-4 rounded shadow mt-6">
+      <h2 class="text-xl mb-3">Saved Carts</h2>
+      <button id="refreshCarts" class="mb-2 bg-gray-600 text-white px-3 py-1 rounded text-sm">Refresh</button>
+      <div id="cartsContainer" class="space-y-4 max-h-96 overflow-y-auto"></div>
     </div>
   </div>
 
-  <script>
-    const REPO = 'YOUR_GITHUB_USERNAME/YOUR_REPO_NAME';
-    const TOKEN = 'YOUR_PERSONAL_ACCESS_TOKEN';
-    if (!localStorage.getItem('adminToken')) location.href = 'login.html';
-    document.getElementById('logout').onclick = () => { localStorage.removeItem('adminToken'); location.href = 'login.html'; };
-    document.getElementById('refreshCarts').onclick = loadCarts;
-    document.getElementById('saveCsv').onclick = saveCsv;
-    loadCarts(); loadCsv();
-
-    async function loadCarts() {
-      const list = document.getElementById('cartsList');
-      list.innerHTML = '<p class="text-gray-500">Loading…</p>';
-      try {
-        const res = await fetch(`https://api.github.com/repos/${REPO}/contents/carts`, { headers: { Authorization: `token ${TOKEN}` } });
-        const files = await res.json();
-        if (!Array.isArray(files)) throw files;
-        list.innerHTML = '';
-        for (const f of files) {
-          const div = document.createElement('div');
-          div.className = 'flex justify-between items-center border-b py-1 text-sm';
-          div.innerHTML = `<span>${f.name} (${new Date().toLocaleString()})</span>
-            <button class="text-red-600" onclick="deleteCart('${f.name}','${f.sha}')">Delete</button>`;
-          list.appendChild(div);
-        }
-        if (files.length === 0) list.innerHTML = '<p class="text-gray-500">No carts yet.</p>';
-      } catch (e) { console.error(e); list.innerHTML = '<p class="text-red-500">Error loading carts</p>'; }
-    }
-    window.deleteCart = async (name, sha) => {
-      if (!confirm(`Delete ${name}?`)) return;
-      await fetch(`https://api.github.com/repos/${REPO}/contents/carts/${name}`, {
-        method: 'DELETE',
-        headers: { Authorization: `token ${TOKEN}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: `Delete cart ${name}`, sha })
-      });
-      loadCarts();
-    };
-
-    let csvSha = '';
-    async function loadCsv() {
-      const ed = document.getElementById('csvEditor');
-      try {
-        const res = await fetch(`https://api.github.com/repos/${REPO}/contents/data/items.csv`, { headers: { Authorization: `token ${TOKEN}` } });
-        const data = await res.json();
-        csvSha = data.sha;
-        ed.value = atob(data.content);
-      } catch (e) { ed.value = 'Error loading CSV'; }
-    }
-    async function saveCsv() {
-      const msg = document.getElementById('csvMsg');
-      const content = btoa(document.getElementById('csvEditor').value);
-      try {
-        const res = await fetch(`https://api.github.com/repos/${REPO}/contents/data/items.csv`, {
-          method: 'PUT',
-          headers: { Authorization: `token ${TOKEN}`, 'Content-Type': 'application/json' },
-          body: JSON.stringify({ message: `Admin CSV update ${new Date().toLocaleString()}`, content, sha: csvSha })
-        });
-        const json = await res.json();
-        csvSha = json.content.sha;
-        msg.textContent = 'Saved!';
-        setTimeout(() => msg.textContent = '', 2000);
-      } catch (e) { console.error(e); msg.textContent = 'Error'; }
-    }
-  </script>
   <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
   <script src="admin.js"></script>
 </body>
-
 </html>
