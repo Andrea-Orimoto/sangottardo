@@ -1,15 +1,25 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8">
   <title>Admin Panel</title>
   <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
 </head>
+
 <body class="bg-gray-100 p-4">
   <div class="container mx-auto max-w-6xl">
     <div class="flex justify-between items-center mb-6">
       <h1 class="text-2xl font-bold">Admin Panel</h1>
       <button id="logout" class="bg-red-600 text-white px-4 py-2 rounded">Logout</button>
+      <div class="mt-6">
+        <h3 class="text-lg font-semibold mb-2">Add Admin</h3>
+        <div class="flex gap-2">
+          <input type="email" id="newAdminEmail" placeholder="new.admin@gmail.com" class="p-2 border rounded flex-1">
+          <button id="addAdminBtn" class="bg-green-600 text-white px-4 py-2 rounded">Add</button>
+        </div>
+        <p id="adminMsg" class="mt-2 text-sm"></p>
+      </div>
     </div>
 
     <div class="grid md:grid-cols-2 gap-6">
@@ -23,7 +33,8 @@
       <!-- CSV Editor -->
       <div class="bg-white p-4 rounded shadow">
         <h2 class="text-xl mb-3">Edit items.csv</h2>
-        <textarea id="csvEditor" class="w-full h-96 font-mono text-xs p-2 border" placeholder="Loading..."></textarea><br>
+        <textarea id="csvEditor" class="w-full h-96 font-mono text-xs p-2 border"
+          placeholder="Loading..."></textarea><br>
         <button id="saveCsv" class="mt-2 bg-green-600 text-white px-4 py-2 rounded">Save & Commit</button>
         <p id="csvMsg" class="mt-2 text-sm"></p>
       </div>
@@ -33,8 +44,8 @@
   <script>
     const REPO = 'YOUR_GITHUB_USERNAME/YOUR_REPO_NAME';
     const TOKEN = 'YOUR_PERSONAL_ACCESS_TOKEN';
-    if (!localStorage.getItem('adminToken')) location.href='login.html';
-    document.getElementById('logout').onclick = () => { localStorage.removeItem('adminToken'); location.href='login.html'; };
+    if (!localStorage.getItem('adminToken')) location.href = 'login.html';
+    document.getElementById('logout').onclick = () => { localStorage.removeItem('adminToken'); location.href = 'login.html'; };
     document.getElementById('refreshCarts').onclick = loadCarts;
     document.getElementById('saveCsv').onclick = saveCsv;
     loadCarts(); loadCsv();
@@ -43,7 +54,7 @@
       const list = document.getElementById('cartsList');
       list.innerHTML = '<p class="text-gray-500">Loading…</p>';
       try {
-        const res = await fetch(`https://api.github.com/repos/${REPO}/contents/carts`, {headers:{Authorization:`token ${TOKEN}`}});
+        const res = await fetch(`https://api.github.com/repos/${REPO}/contents/carts`, { headers: { Authorization: `token ${TOKEN}` } });
         const files = await res.json();
         if (!Array.isArray(files)) throw files;
         list.innerHTML = '';
@@ -54,15 +65,15 @@
             <button class="text-red-600" onclick="deleteCart('${f.name}','${f.sha}')">Delete</button>`;
           list.appendChild(div);
         }
-        if (files.length===0) list.innerHTML = '<p class="text-gray-500">No carts yet.</p>';
-      } catch(e){ console.error(e); list.innerHTML='<p class="text-red-500">Error loading carts</p>'; }
+        if (files.length === 0) list.innerHTML = '<p class="text-gray-500">No carts yet.</p>';
+      } catch (e) { console.error(e); list.innerHTML = '<p class="text-red-500">Error loading carts</p>'; }
     }
     window.deleteCart = async (name, sha) => {
       if (!confirm(`Delete ${name}?`)) return;
       await fetch(`https://api.github.com/repos/${REPO}/contents/carts/${name}`, {
-        method:'DELETE',
-        headers:{Authorization:`token ${TOKEN}`,'Content-Type':'application/json'},
-        body:JSON.stringify({message:`Delete cart ${name}`, sha})
+        method: 'DELETE',
+        headers: { Authorization: `token ${TOKEN}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: `Delete cart ${name}`, sha })
       });
       loadCarts();
     };
@@ -71,27 +82,30 @@
     async function loadCsv() {
       const ed = document.getElementById('csvEditor');
       try {
-        const res = await fetch(`https://api.github.com/repos/${REPO}/contents/data/items.csv`, {headers:{Authorization:`token ${TOKEN}`}});
+        const res = await fetch(`https://api.github.com/repos/${REPO}/contents/data/items.csv`, { headers: { Authorization: `token ${TOKEN}` } });
         const data = await res.json();
         csvSha = data.sha;
         ed.value = atob(data.content);
-      } catch(e){ ed.value='Error loading CSV'; }
+      } catch (e) { ed.value = 'Error loading CSV'; }
     }
     async function saveCsv() {
       const msg = document.getElementById('csvMsg');
       const content = btoa(document.getElementById('csvEditor').value);
       try {
         const res = await fetch(`https://api.github.com/repos/${REPO}/contents/data/items.csv`, {
-          method:'PUT',
-          headers:{Authorization:`token ${TOKEN}`,'Content-Type':'application/json'},
-          body:JSON.stringify({message:`Admin CSV update ${new Date().toLocaleString()}`, content, sha:csvSha})
+          method: 'PUT',
+          headers: { Authorization: `token ${TOKEN}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ message: `Admin CSV update ${new Date().toLocaleString()}`, content, sha: csvSha })
         });
         const json = await res.json();
         csvSha = json.content.sha;
         msg.textContent = 'Saved!';
-        setTimeout(()=>msg.textContent='',2000);
-      } catch(e){ console.error(e); msg.textContent='Error'; }
+        setTimeout(() => msg.textContent = '', 2000);
+      } catch (e) { console.error(e); msg.textContent = 'Error'; }
     }
   </script>
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  <script src="admin.js"></script>
 </body>
+
 </html>

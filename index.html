@@ -112,19 +112,18 @@
         let googleUser = null;
 
         function onGoogleSignIn(googleUserProfile) {
-            googleUser = googleUserProfile;
-            const profile = googleUser.getBasicProfile();
+            window.googleUser = googleUserProfile;
+            const profile = googleUserProfile.getBasicProfile();
             const userInfo = document.getElementById('userInfo');
             if (userInfo) {
-                userInfo.innerHTML = `Hi, ${profile.getName()}`;
+                userInfo.innerHTML = `Hi, ${profile.getName()} (${profile.getEmail()})`;
                 userInfo.classList.remove('hidden');
             }
-            const signInDiv = document.getElementById('googleSignIn');
-            if (signInDiv) signInDiv.classList.add('hidden');
-            // Call app.js function
-            if (typeof loadCartFromDrive === 'function') {
-                loadCartFromDrive();
-            }
+            document.getElementById('googleSignIn')?.classList.add('hidden');
+
+            // Load cart + check admin
+            loadCartFromDrive();
+            loadAdmins(); // NEW
         }
 
         function renderGoogleButton() {

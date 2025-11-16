@@ -21,6 +21,7 @@ async function init() {
   console.log('INIT: Starting...');
   await loadCSVAndStatus();
   console.log("INIT: Items loaded →", allItems.length);
+  await loadAdmins();
   if (allItems.length === 0) {
     console.warn("NO ITEMS — CHECK CSV");
     document.getElementById('grid').innerHTML = '<p class="text-center text-gray-500">No items found. Check data/items.csv</p>';
@@ -424,4 +425,30 @@ async function init() {
       container.appendChild(div);
     }
   };
+}
+
+let admins = [];
+
+async function loadAdmins() {
+  try {
+    const resp = await fetch('data/admins.json');
+    if (resp.ok) {
+      admins = await resp.json();
+      console.log("Admins loaded:", admins);
+      checkAdminAccess();
+    }
+  } catch (e) {
+    console.error("Failed to load admins.json", e);
+  }
+}
+
+function checkAdminAccess() {
+  if (!googleUser) return;
+  const profile = googleUser.getBasicProfile();
+  const email = profile.getEmail();
+  const adminLink = document.getElementById('adminLink');
+  if (admins.includes(email) && adminLink) {
+    adminLink.classList.remove('hidden');
+    console.log("ADMIN ACCESS GRANTED:", email);
+  }
 }
