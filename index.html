@@ -1,174 +1,107 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="it">
 
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Inventario San Gottardo</title>
-    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
-    <link href="style.css?6" rel="stylesheet">
-
-    <!-- Google Sign-In SDK -->
-    <meta name="google-signin-client_id"
-        content="1049409960184-lt0jqecoman6nmnfgc94ntss04vemur2.apps.googleusercontent.com">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+    <title>Sangottardo – Inventario</title>
+    <script src="https://cdn.jsdelivr.net/npm/papaparse@5.3.2/papaparse.min.js"></script>
+    <!-- ADD YOUR GOOGLE CLIENT ID -->
+    <script
+        src="https://apis.google.com/js/platform.js?onload=renderGoogleButton&client_id=1049409960184-lt0jqecoman6nmnfgc94ntss04vemur2.apps.googleusercontent.com"
+        async defer></script>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet" />
+    <link rel="stylesheet" href="style.css" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.css" />
     <script src="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.js"></script>
-
-    <script>
-        function renderGoogleButton() {
-            if (!window.gapi) {
-                setTimeout(renderGoogleButton, 100);
-                return;
-            }
-            gapi.load('signin2', function () {
-                gapi.signin2.render('googleSignIn', {
-                    scope: 'profile email https://www.googleapis.com/auth/drive.appdata',
-                    width: 200,
-                    height: 40,
-                    longtitle: true,
-                    theme: 'dark',
-                    onsuccess: onGoogleSignIn,
-                    onfailure: function () { console.log('Google sign-in failed'); }
-                });
-            });
+    <style>
+        .swiper.mySwiper {
+            opacity: 0;
+            transition: opacity 0.2s ease;
         }
-    </script>
-    <script src="https://apis.google.com/js/platform.js?onload=renderGoogleButton" async defer></script>
-    <script src="https://apis.google.com/js/api.js"></script>
+
+        .swiper.mySwiper.swiper-ready {
+            opacity: 1;
+        }
+    </style>
 </head>
 
-<body class="bg-gray-50 text-gray-800">
-    <div class="container mx-auto p-4">
-        <header class="flex justify-between items-center mb-8">
-            <h1 class="text-3xl font-bold">Inventario San Gottardo</h1>
-            <div class="flex gap-2">
-                <a id="adminLink" href="admin.html" class="hidden text-indigo-600 text-sm">Admin</a>
-                <!-- Login Button (near cart icon) -->
-                <div id="googleSignIn" class="inline-block"></div>
+<body class="bg-gray-50">
+
+    <!-- ==================== HEADER ==================== -->
+    <header class="bg-white shadow-sm sticky top-0 z-40">
+        <div class="max-w-7xl mx-auto px-4 py-3 flex justify-between items-center">
+            <div class="flex items-center gap-4">
+                <a href="index.html" class="text-xl font-bold text-indigo-600">Sangottardo</a>
+                <input id="search" type="text" placeholder="Cerca…" class="p-2 border rounded w-64" />
+                <div id="filters" class="flex items-center gap-2">
+                    <select id="catFilter" class="p-2 border rounded"></select>
+                </div>
+            </div>
+
+            <div class="flex items-center gap-3">
+                <button id="preferitiBtn"
+                    class="bg-indigo-600 text-white p-2 rounded-full flex items-center gap-1 text-sm">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+                    </svg>
+                    <span id="preferitiCount">0</span>
+                </button>
+                <div id="googleSignIn"></div>
                 <div id="userInfo" class="hidden text-sm text-gray-600 ml-2"></div>
-                <button id="cartBtn" class="bg-indigo-600 text-white px-4 py-2 rounded">Cart (<span
-                        id="cartCount">0</span>)</button>
-                <a href="admin.html" class="bg-gray-700 text-white px-4 py-2 rounded hidden" id="adminLink">Admin</a>
-            </div>
-
-        </header>
-
-        <!-- Filters -->
-        <div id="filters" class="mb-6 flex flex-wrap gap-2 items-center">
-            <input type="text" id="search" placeholder="Search items..."
-                class="p-2 border rounded flex-1 min-w-[200px]">
-            <select id="catFilter" class="p-2 border rounded"></select>
-            <button id="clearFilters" class="bg-gray-300 px-3 py-2 rounded text-sm">Clear</button>
-        </div>
-
-        <!-- GRID CONTAINER -->
-        <div id="grid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6 mb-8"></div>
-
-        <!-- Load More Button -->
-        <div class="text-center">
-            <button id="loadMore" class="bg-indigo-600 text-white px-6 py-2 rounded hidden">Load More</button>
-        </div>
-
-        <!-- Cart sidebar -->
-        <div id="cartSidebar"
-            class="fixed right-0 top-0 h-full w-80 bg-white shadow-lg transform translate-x-full transition-transform p-4 overflow-y-auto">
-            <button id="closeCart" class="float-right text-2xl">&times;</button>
-            <h2 class="text-xl font-bold mb-4">Your Cart</h2>
-            <div id="cartItems"></div>
-            <button id="saveCartBtn" class="mt-4 w-full bg-green-600 text-white py-2 rounded">Save Cart to
-                Server</button>
-            <p id="saveMsg" class="mt-2 text-sm"></p>
-        </div>
-
-        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.css" />
-
-        <!-- Modal -->
-        <div id="modal" class="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center hidden z-50">
-            <div class="bg-white max-w-4xl w-full m-4 rounded overflow-hidden relative">
-                <button id="closeModal"
-                    class="absolute top-2 right-2 text-2xl bg-white rounded-full w-8 h-8 z-10 shadow">&times;</button>
-
-                <!-- Swiper Carousel -->
-                <div class="swiper mySwiper" style="height: 60vh; max-height: 500px;">
-                    <div class="swiper-wrapper" id="swiperWrapper"></div>
-                    <div class="swiper-pagination"></div>
-                    <div class="swiper-button-next"></div>
-                    <div class="swiper-button-prev"></div>
-                </div>
-
-                <!-- Details -->
-                <div class="p-4 border-t">
-                    <h2 id="modalTitle" class="text-xl font-bold mb-2"></h2>
-                    <div id="modalDesc" class="text-sm mb-4"></div>
-                    <button id="addToCartBtn" class="bg-indigo-600 text-white w-full py-2 rounded">Add to Cart</button>
-                </div>
+                <a id="adminLink" href="admin.html" class="bg-gray-700 text-white px-4 py-2 rounded hidden">Admin</a>
             </div>
         </div>
+    </header>
 
+    <!-- ==================== GRID ==================== -->
+    <main class="max-w-7xl mx-auto px-4 py-6">
+        <div id="grid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6"></div>
+        <button id="loadMore" class="mt-8 w-full py-2 bg-indigo-600 text-white rounded">Carica altri</button>
+    </main>
+
+    <!-- ==================== MODAL ==================== -->
+    <!-- MODAL — STABILE, IMMAGINE GRANDE, CUORE -->
+    <div id="modal" class="fixed inset-0 bg-black/50 hidden flex items-center justify-center z-50 p-4 overflow-y-auto">
+        <div class="bg-white rounded-lg w-full max-w-2xl max-h-full flex flex-col overflow-hidden shadow-xl relative">
+
+            <!-- CLOSE BUTTON -->
+            <button id="closeModal"
+                class="absolute top-4 right-4 w-10 h-10 flex items-center justify-center text-2xl text-gray-600 hover:text-gray-900 bg-white rounded-full shadow-md z-20 hover:shadow-lg transition">
+                ×
+            </button>
+
+            <!-- SWIPER — 500px -->
+            <div class="swiper mySwiper relative" style="height: 500px;">
+                <div id="swiperWrapper" class="swiper-wrapper"></div>
+                <div class="swiper-button-prev"></div>
+                <div class="swiper-button-next"></div>
+                <div class="swiper-pagination"></div>
+
+                <!-- CUORE TOGGLE -->
+                <button id="modalHeartBtn"
+                    class="absolute top-4 left-4 w-10 h-10 bg-white rounded-full shadow-md flex items-center justify-center z-10 hover:shadow-lg transition">
+                    <!-- SVG da JS -->
+                </button>
+            </div>
+
+            <!-- INFO -->
+            <div class="p-6 space-y-4">
+                <h2 id="modalTitle" class="text-2xl font-bold"></h2>
+                <div id="modalDesc" class="text-sm space-y-1 max-h-40 overflow-y-auto"></div>
+            </div>
+        </div>
     </div>
 
-    <script>
-        // === GLOBAL FUNCTIONS FOR GOOGLE SDK ===
-        let googleUser = null;
+    <!-- ==================== PREFERITI SIDEBAR ==================== -->
+    <div id="preferitiSidebar"
+        class="fixed right-0 top-0 h-full w-80 bg-white shadow-lg transform translate-x-full transition-transform p-4 overflow-y-auto z-50">
+        <button id="closePreferiti" class="float-right text-2xl">&times;</button>
+        <h2 class="text-xl font-bold mb-4">Preferiti</h2>
+        <div id="preferitiItems"></div>
+    </div>
 
-        function onGoogleSignIn(googleUserProfile) {
-            window.googleUser = googleUserProfile;
-            const profile = googleUserProfile.getBasicProfile();
-            const userInfo = document.getElementById('userInfo');
-            if (userInfo) {
-                userInfo.innerHTML = `Hi, ${profile.getName()} (${profile.getEmail()})`;
-                userInfo.classList.remove('hidden');
-            }
-            document.getElementById('googleSignIn')?.classList.add('hidden');
-
-            // Load cart + check admin
-            loadCartFromDrive();
-            loadAdmins(); // NEW
-        }
-
-        function renderGoogleButton() {
-            if (!window.gapi) {
-                setTimeout(renderGoogleButton, 100);
-                return;
-            }
-            gapi.load('signin2', function () {
-                gapi.signin2.render('googleSignIn', {
-                    scope: 'profile email https://www.googleapis.com/auth/drive.appdata',
-                    width: 200,
-                    height: 40,
-                    longtitle: true,
-                    theme: 'dark',
-                    onsuccess: onGoogleSignIn,
-                    onfailure: function () { console.log('Google sign-in failed'); }
-                });
-            });
-        }
-    </script>
-
-    <!-- Google SDK -->
-    <script src="https://apis.google.com/js/platform.js?onload=renderGoogleButton" async defer></script>
-    <script src="https://apis.google.com/js/api.js"></script>
-
-    <script>
-        console.log("APP.JS TEST: This should appear");
-    </script>
-    <script>
-        // Read URL params on load
-        document.addEventListener('DOMContentLoaded', () => {
-            const urlParams = new URLSearchParams(window.location.search);
-            const cat = urlParams.get('cat');
-            if (cat) {
-                const catFilter = document.getElementById('catFilter');
-                if (catFilter) {
-                    // Wait for options to load
-                    setTimeout(() => {
-                        catFilter.value = cat;
-                        catFilter.dispatchEvent(new Event('change'));
-                    }, 500);
-                }
-            }
-        });
-    </script>
     <script src="app.js"></script>
 </body>
 
