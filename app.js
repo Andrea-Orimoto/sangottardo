@@ -226,7 +226,7 @@ async function init() {
       const isAdmin = !!localStorage.getItem('adminToken');
 
       let statusHtml;
-      if (isAdmin) {
+      if (false) {
         statusHtml = `
         <select class="text-xs p-1 rounded border bg-white" 
                 onchange="saveStatus('${item.UUID}', this.value)"
