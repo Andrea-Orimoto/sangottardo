@@ -258,6 +258,7 @@ async function init() {
             class="max-h-full max-w-full object-contain transition-transform hover:scale-105" 
             onerror="this.src='images/placeholder.jpg'">
         ${photoCountBadge}
+       
       </div>
       <div class="p-3 h-32 flex flex-col justify-between bg-white">
         <div>
