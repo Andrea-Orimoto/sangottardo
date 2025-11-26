@@ -1,32 +1,33 @@
 console.log("APP.JS LOADED SUCCESSFULLY");
 
+window.loadPreferiti = loadPreferiti;  // ← expose it
+
+// Trasforma email in chiave valida per Firebase (sostituisce . con _)
+function getEmailKey(email) {
+  return email.replace(/\./g, '_');
+}
+
 document.addEventListener('DOMContentLoaded', () => {
   console.log("DOM READY — CALLING INIT()");
   init();
 });
 
-// ==== CONFIG ==== 
-const REPO = 'Andrea-Orimoto/sangottardo';
-const GITHUB_TOKEN = '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';
-const ADMIN_PASSWORD_HASH = '6972cf16a98ceb52957e425cdf7dc642eca2e97cc1aef848f530509894362d32'; // default "password"
-// =================================
-
 const PAGE_SIZE = 12;
 let allItems = [], displayed = 0;
-let cart = [];
-window.statusData = {}; // ADD THIS LINE
-
-// Use global googleUser from index.html
+window.statusData = {};
+window.preferitiData = {};        // ← NEW: global favorites per user
 
 async function init() {
-
-  // TEMP: FORCE ADMIN (REMOVE LATER)
-  localStorage.setItem('adminToken', 'debug-admin');
-
-  console.log('INIT: Starting...');
   try {
+    // 1. Load items first
     await loadCSVAndStatus();
     console.log("INIT: Items loaded →", allItems.length);
+
+    // 2. THEN load preferiti (this sets window.preferitiData correctly)
+    await loadPreferiti();   // ← this now fully populates preferitiData
+
+    // DO NOT renderGrid() here — loadPreferiti() will do it!
+
   } catch (e) {
     console.error("INIT FAILED:", e);
     const grid = document.getElementById('grid');
@@ -35,230 +36,363 @@ async function init() {
     }
     return;
   }
-  await loadAdmins();
+
   if (allItems.length === 0) {
     console.warn("NO ITEMS — CHECK CSV");
     document.getElementById('grid').innerHTML = '<p class="text-center text-gray-500">No items found. Check data/items.csv</p>';
     return;
   }
-  renderGrid();
+
+  // Grid is rendered inside loadPreferiti() → correct data guaranteed
   console.log('INIT: Grid rendered');
   setupFilters();
-  renderCartCount();
-  document.getElementById('cartBtn').onclick = toggleCart;
-  document.getElementById('closeCart').onclick = () => toggleCart(false);
   document.getElementById('loadMore').onclick = () => renderGrid(true);
-  document.getElementById('clearFilters').onclick = clearFilters;
-  const adminLink = document.getElementById('adminLink');
-  if (adminLink && localStorage.getItem('adminToken')) {
-    adminLink.classList.remove('hidden');
-  }
 
-  async function loadCSVAndStatus() {
+  // Sidebar toggle — FIXED for mobile
+  document.getElementById('preferitiToggle')?.addEventListener('click', (e) => {
+    e.stopPropagation();  // ← ADD: Prevent bubbling to header
+    const sidebar = document.getElementById('preferitiSidebar');
+    const overlay = document.getElementById('preferitiOverlay');
+    sidebar.classList.toggle('-translate-x-full');
+    overlay.classList.toggle('hidden');
+  }, { passive: false });  // ← ADD: For touch events on mobile
+
+  document.getElementById('closePreferiti')?.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const sidebar = document.getElementById('preferitiSidebar');
+    const overlay = document.getElementById('preferitiOverlay');
+    sidebar.classList.add('-translate-x-full');
+    overlay.classList.add('hidden');
+  }, { passive: false });
+
+  // Overlay click to close — FIXED to not block grid touches
+  document.getElementById('preferitiOverlay')?.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const sidebar = document.getElementById('preferitiSidebar');
+    sidebar.classList.add('-translate-x-full');
+    e.target.classList.add('hidden');  // ← Self-hide
+  }, { passive: false });
+}
+
+async function loadCSVAndStatus() {
+  try {
+    const resp = await fetch('data/items.csv');
+    const text = await resp.text();
+    const parsed = Papa.parse(text, { header: true, skipEmptyLines: true });
+
+    const map = new Map();
+    parsed.data.forEach(row => {
+      const uuid = row.UUID;
+      if (!uuid) return;
+      if (!map.has(uuid)) map.set(uuid, { ...row, Photos: [] });
+      const photos = (row.Photos || '').trim().split(/\s+/).filter(Boolean);
+      if (photos.length) map.get(uuid).Photos.push(...photos);
+    });
+
+    allItems = Array.from(map.values());
+
+    // Load status.json
     try {
-      // Load items.csv
-      const resp = await fetch('data/items.csv');
-      const text = await resp.text();
-      const parsed = Papa.parse(text, { header: true, skipEmptyLines: true });
-
-      const map = new Map();
-      parsed.data.forEach(row => {
-        const uuid = row.UUID;
-        if (!uuid) return;
-        if (!map.has(uuid)) map.set(uuid, { ...row, Photos: [] });
-        const photos = (row.Photos || '').trim().split(/\s+/).filter(Boolean);
-        if (photos.length) map.get(uuid).Photos.push(...photos);
-      });
-
-      allItems = Array.from(map.values());
-
-      // Load status.json (only Venduto items)
-      try {
-        const statusResp = await fetch('data/status.json');
-        if (statusResp.ok) {
-          const statusData = await statusResp.json();
-          allItems.forEach(item => {
-            item.Status = statusData[item.UUID] || ''; // blank = Disponibile
-          });
-        }
-      } catch (e) {
-        console.warn("No status.json — all items Disponibile");
+      const statusResp = await fetch('data/status.json');
+      if (statusResp.ok) {
+        const statusData = await statusResp.json();
+        allItems.forEach(item => {
+          item.Status = statusData[item.UUID] || '';
+        });
       }
+    } catch (e) { console.warn("No status.json — all Disponibile"); }
 
-    } catch (e) {
-      console.error("Load failed:", e);
-      allItems = [];
-    }
+  } catch (e) {
+    console.error("Load failed:", e);
+    allItems = [];
   }
+}
 
-  function formatPrice(item) {
-    const price = item['Purchase Price'];
-    const currency = item['Purchase Currency'] || 'EUR';
-    return price ? `${price} ${currency}` : '—';
-  }
+// ============ PREFERITI SYSTEM ============
+// Firebase config — incolla la tua qui
+// For Firebase JS SDK v7.20.0 and later, measurementId is optional
+const firebaseConfig = {
+  apiKey: "AIzaSyCq_W69Eab67KpnX8HTEkzRHBW7TB_6daQ",
+  authDomain: "san-gottardo-preferiti.firebaseapp.com",
+  databaseURL: "https://san-gottardo-preferiti-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId: "san-gottardo-preferiti",
+  storageBucket: "san-gottardo-preferiti.firebasestorage.app",
+  messagingSenderId: "1012486211234",
+  appId: "1:1012486211234:web:04b3bb02b84cb19ef839fb",
+  measurementId: "G-LSLDZBSJFR"
+};
 
-  function filterItems() {
-    const q = (document.getElementById('search').value || '').toLowerCase().trim();
-    const locFilter = document.getElementById('catFilter').value;
-    const statusFilter = document.getElementById('statusFilter')?.value || '';
+// Inizializza Firebase
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+const auth = firebase.auth();
 
-    return allItems.filter(item => {
-      const searchText = [item.Item, item.Location, item.Categories, item.Notes].join(' ').toLowerCase();
-      const matchSearch = !q || searchText.includes(q);
-      const matchLocation = !locFilter || (item.Location || '') === locFilter;
 
-      const isSold = (item.Status || '').trim() === 'Venduto';
-      const matchStatus = !statusFilter ||
-        (statusFilter === 'Disponibile' && !isSold) ||
-        (statusFilter === 'Venduto' && isSold);
-
-      return matchSearch && matchLocation && matchStatus;
-    });
-  }
-
-  function setupFilters() {
-    const sel = document.getElementById('catFilter');
-    const totalItems = allItems.length;
-
-    // === ONE "All Categories" ONLY ===
-    sel.innerHTML = '';
-    const allOption = document.createElement('option');
-    allOption.value = '';
-    allOption.textContent = `All Categories (${totalItems})`;
-    sel.appendChild(allOption);
-
-    // === Real categories ===
-    const locations = [...new Set(allItems.map(i => i.Location).filter(Boolean))].sort();
-    const locationCount = {};
-    allItems.forEach(item => {
-      const loc = item.Location || 'Uncategorized';
-      locationCount[loc] = (locationCount[loc] || 0) + 1;
-    });
-
-    locations.forEach(loc => {
-      const opt = document.createElement('option');
-      opt.value = loc;
-      opt.textContent = `${loc} (${locationCount[loc]})`;
-      sel.appendChild(opt);
-    });
-
-    // === STATUS FILTER (TOP BAR) ===
-    const statusSel = document.createElement('select');
-    statusSel.id = 'statusFilter';
-    statusSel.className = 'ml-2 p-2 border rounded';
-    statusSel.innerHTML = `
-      <option value="">All Status</option>
-      <option value="Disponibile">Disponibile</option>
-      <option value="Venduto">Venduto</option>
-    `;
-    statusSel.addEventListener('change', () => { displayed = 0; renderGrid(); });
-    document.querySelector('#filters').appendChild(statusSel);
-
-    const filtersDiv = document.querySelector('#filters');
-    if (filtersDiv) filtersDiv.appendChild(statusSel);
-
-    // === Search ===
-    let timeout;
-    document.getElementById('search').addEventListener('input', () => {
-      clearTimeout(timeout);
-      timeout = setTimeout(() => { displayed = 0; renderGrid(); }, 300);
-    });
-
-    // === Category change + URL update ===
-    sel.addEventListener('change', () => {
-      displayed = 0;
-      renderGrid();
-      const url = new URL(window.location);
-      const val = sel.value;
-      if (val) {
-        url.searchParams.set('cat', val);
-      } else {
-        url.searchParams.delete('cat');
-      }
-      window.history.replaceState({}, '', url);
-    });
-
-    // === Status change ===
-    statusSel.addEventListener('change', () => { displayed = 0; renderGrid(); saveStatus(); });
-
-    // === URL ?cat= pre-select ===
-    const urlParams = new URLSearchParams(window.location.search);
-    const urlCat = urlParams.get('cat');
-    if (urlCat) {
-      setTimeout(() => {
-        const option = sel.querySelector(`option[value="${urlCat}"]`);
-        if (option) {
-          sel.value = urlCat;
-          sel.dispatchEvent(new Event('change'));
-        }
-      }, 100);
-    }
-  }
-
-  function clearFilters() {
-    document.getElementById('search').value = '';
-    document.getElementById('catFilter').value = '';
-    if (document.getElementById('statusFilter')) document.getElementById('statusFilter').value = '';
-    displayed = 0;
+// Carica preferiti da Firebase
+// ---- FUNZIONE 1: loadPreferiti (sostituisci tutta) ----
+async function loadPreferiti() {
+  if (!window.currentUser) {
+    window.preferitiData = {};
     renderGrid();
+    renderPreferitiSidebar();
+    updatePreferitiCount();
+    return;
   }
 
-  function renderGrid(loadMore = false) {
-    if (!loadMore) {
-      document.getElementById('grid').innerHTML = '';
-      displayed = 0;
-    }
+  const key = window.currentUser.email.replace(/\./g, '_');
+  try {
+    const snapshot = await db.ref('preferiti/' + key).once('value');
+    const data = snapshot.val();
+    window.preferitiData[window.currentUser.email] = data || [];
+    console.log("Preferiti caricati da Firebase:", window.preferitiData[window.currentUser.email]);
+  } catch (e) {
+    console.warn("Firebase non raggiungibile — uso lista vuota", e);
+    window.preferitiData[window.currentUser.email] = [];
+  }
 
-    const container = document.getElementById('grid');
-    const fragment = document.createDocumentFragment();
-    const filtered = filterItems();
-    const start = displayed;
-    const end = Math.min(start + PAGE_SIZE, filtered.length);
+  renderGrid();
+  renderPreferitiSidebar();
+  updatePreferitiCount();
+}
 
-    for (let i = start; i < end; i++) {
-      const item = filtered[i];
-      const div = document.createElement('div');
-      div.className = 'bg-white rounded overflow-hidden shadow cursor-pointer hover:shadow-lg transition-shadow';
+// Salva su Firebase (istantaneo!)
+// ---- FUNZIONE 2: toggleFavorite (sostituisci tutta) ----
+async function toggleFavorite(uuid) {
+  if (!window.currentUser) {
+    alert("Devi effettuare il login per salvare i Preferiti");
+    return;
+  }
 
-      // === STATUS BADGE & DROPDOWN (VISIBLE TO ALL) ===
-      // === STATUS BADGE (NON-ADMIN) OR DROPDOWN (ADMIN) ===
-      const isSold = (item.Status || '').trim() === 'Venduto';
-      const isAdmin = !!localStorage.getItem('adminToken');
+  const email = window.currentUser.email;
+  const key = email.replace(/\./g, '_');
+  let list = (window.preferitiData[email] || []).slice();
 
-      let statusHtml;
-      if (false) {
-        statusHtml = `
-        <select class="text-xs p-1 rounded border bg-white" 
-                onchange="saveStatus('${item.UUID}', this.value)"
-                onclick="event.stopPropagation();">
-          <option value="Disponibile" ${!isSold ? 'selected' : ''}>Disponibile</option>
-          <option value="Venduto" ${isSold ? 'selected' : ''}>Venduto</option>
-        </select>
-      `;
-      } else {
-        statusHtml = isSold
-          ? '<span class="bg-red-100 text-red-800 text-xs px-2 py-1 rounded">Venduto</span>'
-          : '<span class="bg-green-100 text-green-800 text-xs px-2 py-1 rounded">Disponibile</span>';
-      }
+  const index = list.indexOf(uuid);
+  if (index > -1) {
+    list.splice(index, 1);
+  } else {
+    list.push(uuid);
+  }
 
-      // === PHOTO COUNT BADGE ===
-      const photoCountBadge = item.Photos.length > 1 ? `
+  window.preferitiData[email] = list;
+  renderGrid();
+  renderPreferitiSidebar();
+  updatePreferitiCount();
+
+  // Salva su Firebase — istantaneo
+  db.ref('preferiti/' + key).set(list)
+    .then(() => console.log("Preferiti salvati su Firebase"))
+    .catch(e => console.warn("Errore salvataggio Firebase:", e));
+}
+
+// Integra con il tuo login esistente
+// In auth.js, in handleCredentialResponse, dopo window.currentUser = ... :
+auth.signInWithCustomToken(window.currentUser.id).catch(() => { });  // Linka al tuo Google user
+
+// Aggiorna isFavorite per usare Firebase data
+function isFavorite(uuid) {
+  if (!window.currentUser) return false;
+  const list = window.preferitiData[window.currentUser.email] || [];
+  return list.includes(uuid);
+}
+
+// NUOVA handleHeartClick — restituisce Promise
+window.handleHeartClick = async function (uuid) {
+  if (!window.currentUser) {
+    alert("Devi effettuare il login per salvare i Preferiti");
+    return;
+  }
+
+  await toggleFavorite(uuid);  // ← ASPETTA che finisca!
+
+  // Ora possiamo aggiornare il cuore nel modal in modo sicuro
+  const modalHeartBtn = document.querySelector('.swiper button[data-heart]');
+  if (modalHeartBtn) {
+    const isNowFavorite = isFavorite(uuid);
+    modalHeartBtn.querySelector('svg').className =
+      `w-7 h-7 ${isNowFavorite ? 'fill-red-500 text-red-500' : 'text-gray-500'}`;
+  }
+};
+
+// ============ FINAL PREFERITI SYSTEM — NO MORE CONFLICTS ============
+let isSavingPreferiti = false;
+let saveQueue = [];
+
+
+
+function updatePreferitiCount() {
+  const count = window.currentUser ? (window.preferitiData[window.currentUser.email] || []).length : 0;
+  const el = document.getElementById('preferitiCount');
+  if (el) el.textContent = count;
+}
+
+function renderPreferitiSidebar() {
+  const container = document.getElementById('preferitiList');
+  if (!container) return;
+
+  const email = window.currentUser?.email;
+  const uuids = email ? (window.preferitiData[email] || []) : [];
+
+  if (uuids.length === 0) {
+    container.innerHTML = '<p class="text-gray-500 text-center py-8">Nessun preferito</p>';
+    document.getElementById('preferitiCount').textContent = '0';
+    return;
+  }
+
+  document.getElementById('preferitiCount').textContent = uuids.length;
+
+  const fragment = document.createDocumentFragment();
+  uuids.forEach(uuid => {
+    const item = allItems.find(i => i.UUID === uuid);
+    if (!item) return;
+
+    const div = document.createElement('div');
+    div.className = 'flex items-center gap-3 p-3 hover:bg-gray-50 cursor-pointer border-b';
+    div.onclick = () => {
+      openModal(item);
+      document.getElementById('preferitiSidebar').classList.add('-translate-x-full');
+    };
+
+    div.innerHTML = `
+      <img src="images/${item.Photos[0] || 'placeholder.jpg'}" class="w-12 h-12 object-cover rounded" onerror="this.src='images/placeholder.jpg'">
+      <span class="flex-1 text-sm font-medium truncate">${item.Item}</span>
+      <button class="text-red-500 hover:text-red-700 text-xl" onclick="event.stopPropagation(); toggleFavorite('${uuid}');">
+        ×
+      </button>
+    `;
+    fragment.appendChild(div);
+  });
+
+  container.innerHTML = '';
+  container.appendChild(fragment);
+}
+// ==========================================
+
+function formatPrice(item) {
+  const price = item['Purchase Price'];
+  const currency = item['Purchase Currency'] || 'EUR';
+  return price ? `${price} ${currency}` : '—';
+}
+
+function filterItems() {
+  const q = (document.getElementById('search').value || '').toLowerCase().trim();
+  const locFilter = document.getElementById('catFilter').value;
+  const statusFilter = document.getElementById('statusFilter')?.value || '';
+
+  return allItems.filter(item => {
+    const searchText = [item.Item, item.Location, item.Categories, item.Notes].join(' ').toLowerCase();
+    const matchSearch = !q || searchText.includes(q);
+    const matchLocation = !locFilter || (item.Location || '') === locFilter;
+
+    const isSold = (item.Status || '').trim() === 'Venduto';
+    const matchStatus = !statusFilter ||
+      (statusFilter === 'Disponibile' && !isSold) ||
+      (statusFilter === 'Venduto' && isSold);
+
+    return matchSearch && matchLocation && matchStatus;
+  });
+}
+
+function setupFilters() {
+  // ... your existing code unchanged ...
+  // (category filter, status filter, search, etc.)
+  const sel = document.getElementById('catFilter');
+  const totalItems = allItems.length;
+
+  sel.innerHTML = '';
+  const allOption = document.createElement('option');
+  allOption.value = '';
+  allOption.textContent = `All Categories (${totalItems})`;
+  sel.appendChild(allOption);
+
+  const locations = [...new Set(allItems.map(i => i.Location).filter(Boolean))].sort();
+  const locationCount = {};
+  allItems.forEach(item => {
+    const loc = item.Location || 'Uncategorized';
+    locationCount[loc] = (locationCount[loc] || 0) + 1;
+  });
+
+  locations.forEach(loc => {
+    const opt = document.createElement('option');
+    opt.value = loc;
+    opt.textContent = `${loc} (${locationCount[loc]})`;
+    sel.appendChild(opt);
+  });
+
+  // Status filter
+  const statusSel = document.createElement('select');
+  statusSel.id = 'statusFilter';
+  statusSel.className = 'ml-2 p-2 border rounded';
+  statusSel.innerHTML = `<option value="">All Status</option><option value="Disponibile">Disponibile</option><option value="Venduto">Venduto</option>`;
+  statusSel.addEventListener('change', () => { displayed = 0; renderGrid(); });
+  document.querySelector('#filters').appendChild(statusSel);
+
+  // Search + URL handling unchanged...
+  let timeout;
+  document.getElementById('search').addEventListener('input', () => {
+    clearTimeout(timeout);
+    timeout = setTimeout(() => { displayed = 0; renderGrid(); }, 300);
+  });
+
+  sel.addEventListener('change', () => {
+    displayed = 0; renderGrid();
+    const url = new URL(window.location);
+    sel.value ? url.searchParams.set('cat', sel.value) : url.searchParams.delete('cat');
+    window.history.replaceState({}, '', url);
+  });
+
+  const urlParams = new URLSearchParams(window.location.search);
+  const urlCat = urlParams.get('cat');
+  if (urlCat) {
+    setTimeout(() => {
+      const option = sel.querySelector(`option[value="${urlCat}"]`);
+      if (option) { sel.value = urlCat; sel.dispatchEvent(new Event('change')); }
+    }, 100);
+  }
+}
+
+function renderGrid(loadMore = false) {
+  if (!loadMore) {
+    document.getElementById('grid').innerHTML = '';
+    displayed = 0;
+  }
+
+  const container = document.getElementById('grid');
+  const fragment = document.createDocumentFragment();
+  const filtered = filterItems();
+  const start = displayed;
+  const end = Math.min(start + PAGE_SIZE, filtered.length);
+
+  for (let i = start; i < end; i++) {
+    const item = filtered[i];
+    const div = document.createElement('div');
+    div.className = 'bg-white rounded overflow-hidden shadow cursor-pointer hover:shadow-lg transition-shadow relative';
+
+    const isSold = (item.Status || '').trim() === 'Venduto';
+    const favorite = isFavorite(item.UUID);
+
+    const photoCountBadge = item.Photos.length > 1 ? `
       <div class="absolute bottom-2 right-2 bg-black bg-opacity-70 text-white text-xs px-2 py-1 rounded-full flex items-center gap-1">
-        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
-        </svg>
+        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
         <span>${item.Photos.length}</span>
-      </div>
-    ` : '';
+      </div>` : '';
 
-      // === CARD HTML ===
-      div.innerHTML = `
+    const heartIcon = `
+  <button onclick="event.stopPropagation(); handleHeartClick('${item.UUID}')" class="absolute top-2 right-2 bg-white/80 hover:bg-white rounded-full p-2 shadow-md transition z-10">
+    <svg class="w-5 h-5 ${isFavorite(item.UUID) ? 'fill-red-500 text-red-500' : 'text-gray-500'}" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+      <path fill-rule="evenodd" d="M3.172 5.172a4 4 0 015.656 0L10 6.343l1.172-1.171a4 4 0 115.656 5.656L10 17.657l-6.828-6.829a4 4 0 010-5.656z" clip-rule="evenodd" fill="currentColor"></path>
+    </svg>
+  </button>`;
+
+    const statusHtml = isSold
+      ? '<span class="bg-red-100 text-red-800 text-xs px-2 py-1 rounded">Venduto</span>'
+      : '<span class="bg-green-100 text-green-800 text-xs px-2 py-1 rounded">Disponibile</span>';
+
+    div.innerHTML = `
       <div class="bg-gray-100 flex items-center justify-center rounded-t-lg h-48 relative overflow-hidden">
-        <img src="images/${item.Photos[0]}" alt="${item.Item}" 
-            class="max-h-full max-w-full object-contain transition-transform hover:scale-105" 
-            onerror="this.src='images/placeholder.jpg'">
+        <img src="images/${item.Photos[0]}" alt="${item.Item}" class="max-h-full max-w-full object-contain transition-transform hover:scale-105" onerror="this.src='images/placeholder.jpg'">
         ${photoCountBadge}
-       
+        ${heartIcon}
       </div>
       <div class="p-3 h-32 flex flex-col justify-between bg-white">
         <div>
@@ -273,61 +407,26 @@ async function init() {
       </div>
     `;
 
-      div.onclick = () => openModal(item);
-      fragment.appendChild(div);
-    }
-
-    container.appendChild(fragment);
-    displayed = end;
-    document.getElementById('loadMore').classList.toggle('hidden', displayed >= filtered.length);
+    div.onclick = (e) => {
+      if (!e.target.closest('button')) openModal(item);
+    };
+    fragment.appendChild(div);
   }
 
-  function renderCartCount() {
-    document.getElementById('cartCount').textContent = cart.length;
-  }
+  container.appendChild(fragment);
+  displayed = end;
+  document.getElementById('loadMore').classList.toggle('hidden', displayed >= filtered.length);
 
-  function toggleCart(show = null) {
-    const sidebar = document.getElementById('cartSidebar');
-    const isOpen = !sidebar.classList.contains('translate-x-full');
-    if (show === null) show = !isOpen;
-    sidebar.classList.toggle('translate-x-0', show);
-    sidebar.classList.toggle('translate-x-full', !show);
-    if (show) renderCartItems();
-  }
+  renderPreferitiSidebar();   // ← keep sidebar in sync
+  // Update header count
+  const count = window.currentUser ? (window.preferitiData[window.currentUser.email] || []).length : 0;
+  document.getElementById('preferitiCount').textContent = count;
+}
 
-  function renderCartItems() {
-    const container = document.getElementById('cartItems');
-    if (cart.length === 0) {
-      container.innerHTML = '<p class="text-gray-500 italic">Cart is empty</p>';
-      return;
-    }
-    container.innerHTML = cart.map(uuid => {
-      const item = allItems.find(i => i.UUID === uuid);
-      if (!item) return '';
-      return `
-      <div class="flex items-center gap-3 mb-3 p-2 border rounded">
-        <img src="images/${item.Photos[0]}" class="w-16 h-16 object-cover rounded" onerror="this.src='images/placeholder.jpg';">
-        <div class="flex-1">
-          <p class="font-medium text-sm">${item.Item}</p>
-          <p class="text-xs text-gray-600">${item.Location || ''}</p>
-        </div>
-        <button class="text-red-600 text-sm" onclick="removeFromCart('${uuid}')">Remove</button>
-      </div>
-    `;
-    }).join('');
-  }
-
-  window.removeFromCart = function (uuid) {
-    cart = cart.filter(id => id !== uuid);
-    renderCartCount();
-    renderCartItems();
-    saveCartToDrive();
-  };
-
-  // ====== openModal() — FULLY RESTORED ======
-  function openModal(item) {
-    document.getElementById('modalTitle').textContent = item.Item;
-    document.getElementById('modalDesc').innerHTML = `
+// ====== openModal() with heart ======
+function openModal(item) {
+  document.getElementById('modalTitle').textContent = item.Item;
+  document.getElementById('modalDesc').innerHTML = `
     <strong>Serial Number:</strong> ${item['Serial No'] || '—'}<br>
     <strong>Category:</strong> ${item.Location || '—'}<br>
     <strong>Scatola:</strong> ${item.Categories || '—'}<br>
@@ -336,221 +435,59 @@ async function init() {
     <strong>Price:</strong> ${formatPrice(item)}
   `;
 
-    const wrapper = document.getElementById('swiperWrapper');
-    wrapper.innerHTML = '';
-    item.Photos.forEach((src, idx) => {
-      const slide = document.createElement('div');
-      slide.className = 'swiper-slide flex items-center justify-center bg-gray-100';
-      slide.innerHTML = `<img src="images/${src}" alt="${item.Item} - ${idx + 1}" class="max-w-full max-h-full object-contain" onerror="this.src='images/placeholder.jpg'">`;
-      wrapper.appendChild(slide);
-    });
+  const wrapper = document.getElementById('swiperWrapper');
+  wrapper.innerHTML = '';
+  item.Photos.forEach((src, idx) => {
+    const slide = document.createElement('div');
+    slide.className = 'swiper-slide flex items-center justify-center bg-gray-100';
+    slide.innerHTML = `<img src="images/${src}" alt="${item.Item} - ${idx + 1}" class="max-w-full max-h-full object-contain" onerror="this.src='images/placeholder.jpg'">`;
+    wrapper.appendChild(slide);
+  });
 
-    const addBtn = document.getElementById('addToCartBtn');
-    const inCart = cart.includes(item.UUID);
-    addBtn.disabled = inCart || item.Status !== 'Attivo';
-    addBtn.textContent =
-      inCart ? 'Added' :
-        item.Status === 'Venduto' ? 'Sold' :
-          item.Status === 'Prenotato' ? 'Reserved' :
-            'Add to Cart';
-    addBtn.className = 'w-full py-2 rounded text-white font-medium ' + (item.Status !== 'Attivo' ? 'bg-gray-400 cursor-not-allowed' : 'bg-indigo-600');
-    addBtn.onclick = () => addToCart(item.UUID);
+  // Add heart in modal top-right
+  // Rimuovi cuore precedente
+  document.querySelector('.swiper button[data-heart]')?.remove();
 
-    document.getElementById('modal').classList.remove('hidden');
-    document.getElementById('closeModal').onclick = closeModal;
+  const modalHeart = document.createElement('button');
+  modalHeart.setAttribute('data-heart', 'true');
+  modalHeart.className = 'absolute top-4 right-12 bg-white/90 hover:bg-white rounded-full p-3 shadow-lg z-10';
+  modalHeart.innerHTML = `
+  <svg class="w-7 h-7 ${isFavorite(item.UUID) ? 'fill-red-500 text-red-500' : 'text-gray-500'}"
+       viewBox="0 0 24 24" fill="currentColor">
+    <path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z"/>
+  </svg>
+`;
 
-    new Swiper('.mySwiper', {
-      loop: false,
-      pagination: { el: '.swiper-pagination', clickable: true },
-      navigation: { nextEl: '.swiper-button-next', prevEl: '.swiper-button-prev' },
-      spaceBetween: 0,
-      slidesPerView: 1,
-      touchRatio: 1,
-      grabCursor: true
-    });
-  }
-
-  function closeModal() {
-    document.getElementById('modal').classList.add('hidden');
-  }
-
-  // Google Login
-
-  function signOut() {
-    gapi.auth2.getAuthInstance().signOut().then(() => {
-      googleUser = null; cart = []; renderCartCount(); renderCartItems();
-      document.getElementById('userInfo').classList.add('hidden');
-      document.getElementById('googleSignIn').classList.remove('hidden');
-    });
-  }
-
-  // Cart: Google Drive
-  async function saveCartToDrive() {
-    if (!window.googleUser) return;
-    const accessToken = window.googleUser.getAuthResponse().access_token;
-    const fileContent = JSON.stringify({ items: cart, savedAt: new Date().toISOString() });
-    const fileName = 'sangottardo-cart.json';
-    let fileId = null;
-    try {
-      const listRes = await fetch(`https://www.googleapis.com/drive/v3/files?q=name='${fileName}' and trashed=false`, { headers: { Authorization: `Bearer ${accessToken}` } });
-      const listData = await listRes.json();
-      fileId = listData.files[0]?.id;
-    } catch (e) { }
-    const metadata = { name: fileName, mimeType: 'application/json', parents: ['appDataFolder'] };
-    const form = new FormData();
-    form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
-    form.append('file', new Blob([fileContent], { type: 'application/json' }));
-    const url = fileId ? `https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=multipart` : 'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart';
-    await fetch(url, { method: fileId ? 'PATCH' : 'POST', headers: { Authorization: `Bearer ${accessToken}` }, body: form });
-  }
-
-  async function loadCartFromDrive() {
-    if (!window.googleUser) return;
-    const accessToken = window.googleUser.getAuthResponse().access_token;
-    try {
-      const res = await fetch(`https://www.googleapis.com/drive/v3/files?q=name='sangottardo-cart.json' and trashed=false`, { headers: { Authorization: `Bearer ${accessToken}` } });
-      const data = await res.json();
-      if (data.files.length > 0) {
-        const fileId = data.files[0].id;
-        const fileRes = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`, { headers: { Authorization: `Bearer ${accessToken}` } });
-        const fileData = await fileRes.json();
-        cart = fileData.items || [];
-        renderCartCount(); renderCartItems();
-      }
-    } catch (e) { }
-  }
-
-  function addToCart(uuid) {
-    const item = allItems.find(i => i.UUID === uuid);
-    if (!cart.includes(uuid) && item.Status === 'Attivo') {
-      cart.push(uuid);
-      renderCartCount(); renderCartItems();
-      saveCartToDrive();
-    }
-  }
-
-  async function saveStatus(uuid, value) {
-    if (!localStorage.getItem('adminToken')) {
-      alert('Only admins can change status');
-      renderGrid();
-      return;
-    }
-
-    const saveValue = value === 'Disponibile' ? '' : 'Venduto';
-
-    try {
-      const resp = await fetch('data/status.json');
-      const current = resp.ok ? await resp.json() : {};
-
-      if (saveValue === '') {
-        delete current[uuid]; // Remove from status.json if Disponibile
-      } else {
-        current[uuid] = saveValue;
-      }
-
-      const content = btoa(JSON.stringify(current, null, 2));
-      const sha = await getFileSha('data/status.json');
-
-      await fetch(`https://api.github.com/repos/${REPO}/contents/data/status.json`, {
-        method: 'PUT',
-        headers: { 'Authorization': `token ${GITHUB_TOKEN}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: `Status: ${uuid} → ${value}`, content, sha })
-      });
-
-      const item = allItems.find(i => i.UUID === uuid);
-      if (item) item.Status = saveValue;
-
-      renderGrid();
-      console.log(`SAVED: ${uuid} → ${value}`);
-    } catch (e) {
-      alert('Save failed');
-    }
-  }
-
-  async function getFileSha(path) {
-    try {
-      const res = await fetch(`https://api.github.com/repos/${REPO}/contents/${path}`);
-      const data = await res.json();
-      return data.sha;
-    } catch (e) { return null; }
-  }
-
-  // Admin: View All Carts
-  window.loadAllCarts = async function () {
-    const res = await fetch('carts/?_=' + Date.now());
-    const text = await res.text();
-    const files = text.match(/href="([^"]+\.json)"/g)?.map(m => m.match(/href="([^"]+)"/)[1]) || [];
-    const container = document.getElementById('allCarts');
-    container.innerHTML = '<h3 class="text-lg font-bold mb-2">All Saved Carts</h3>';
-    for (const file of files) {
-      const data = await (await fetch(file)).json();
-      const div = document.createElement('div');
-      div.className = 'p-2 border-b';
-      div.innerHTML = `<strong>${new Date(data.savedAt).toLocaleString()}</strong>: ${data.items.length} items`;
-      container.appendChild(div);
-    }
+  modalHeart.onclick = async (e) => {
+    e.stopPropagation();
+    await handleHeartClick(item.UUID);  // ← AWAIT the toggle — ensures data is updated
+    const newFavorite = isFavorite(item.UUID);
+    modalHeart.innerHTML = `
+    <svg class="w-7 h-7 ${isFavorite(item.UUID) ? 'fill-red-500 text-red-500' : 'text-gray-500'}"
+        viewBox="0 0 24 24" fill="currentColor">
+      <path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z"/>
+    </svg>
+  `;
   };
+
+  document.querySelector('.swiper').insertAdjacentElement('afterbegin', modalHeart);
+
+  document.getElementById('modal').classList.remove('hidden');
+  document.getElementById('closeModal').onclick = closeModal;
+
+  new Swiper('.mySwiper', {
+    loop: false,
+    pagination: { el: '.swiper-pagination', clickable: true },
+    navigation: { nextEl: '.swiper-button-next', prevEl: '.swiper-button-prev' },
+    spaceBetween: 0,
+    slidesPerView: 1,
+    touchRatio: 1,
+    grabCursor: true
+  });
 }
 
-let admins = [];
-
-async function loadAdmins() {
-  try {
-    const resp = await fetch('data/admins.json');
-    if (resp.ok) {
-      admins = await resp.json();
-      console.log("Admins loaded:", admins);
-      checkAdminAccess();
-    }
-  } catch (e) {
-    console.error("Failed to load admins.json", e);
-  }
-}
-
-function checkAdminAccess() {
-  if (!googleUser) return;
-  const profile = googleUser.getBasicProfile();
-  const email = profile.getEmail();
-  const adminLink = document.getElementById('adminLink');
-  if (admins.includes(email) && adminLink) {
-    adminLink.classList.remove('hidden');
-    console.log("ADMIN ACCESS GRANTED:", email);
-  }
-}
-
-async function saveStatus(uuid, newStatus) {
-  const saveValue = newStatus === 'Attivo' ? '' : newStatus;
-  try {
-    const resp = await fetch('data/status.json');
-    const data = resp.ok ? await resp.json() : {};
-    data[uuid] = saveValue;
-
-    await fetch(`https://api.github.com/repos/${REPO}/contents/data/status.json`, {
-      method: 'PUT',
-      headers: {
-        'Authorization': `token ${GITHUB_TOKEN}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        message: `Status: ${uuid} → ${newStatus}`,
-        content: btoa(JSON.stringify(data, null, 2)),
-        sha: await getFileSha('data/status.json')
-      })
-    });
-
-    // Update item in memory
-    const item = allItems.find(i => i.UUID === uuid);
-    if (item) item.Status = saveValue;
-
-    renderGrid(); // Refresh grid
-  } catch (e) {
-    alert('Failed to save status: ' + e.message);
-  }
-}
-
-function filterByStatus(value) {
-  const statusFilter = document.getElementById('statusFilter');
-  if (statusFilter) statusFilter.value = value;
-  displayed = 0;
-  renderGrid();
+function closeModal() {
+  document.getElementById('modal').classList.add('hidden');
+  // Clean heart from modal
+  document.querySelector('.swiper button')?.remove();
 }

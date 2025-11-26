@@ -1,60 +1,54 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
-  <meta charset="UTF-8" />
-  <title>Sangottardo Admin</title>
-  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet" />
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Admin – Inventario San Gottardo</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <link href="style.css?9" rel="stylesheet">
+
+    <!-- Google Sign-In (same as index.html) -->
+    <meta name="google-signin-client_id"
+        content="1049409960184-lt0jqecoman6nmnfgc94ntss04vemur2.apps.googleusercontent.com">
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <script src="auth.js"></script>
+
 </head>
-<body class="bg-gray-100 p-4">
-  <div class="container mx-auto max-w-6xl">
-    <div class="flex justify-between items-center mb-6">
-      <h1 class="text-2xl font-bold text-indigo-700">Sangottardo Admin</h1>
-      <div class="flex items-center gap-3">
-        <div id="userInfo" class="text-sm text-gray-600"></div>
-        <button id="logout" class="bg-red-600 text-white px-4 py-2 rounded text-sm">Logout</button>
-      </div>
-    </div>
 
-    <!-- Add Admin -->
-    <div class="bg-white p-4 rounded shadow mb-6">
-      <h3 class="text-lg font-semibold mb-2">Add Admin</h3>
-      <div class="flex gap-2">
-        <input type="email" id="newAdminEmail" placeholder="new.admin@gmail.com" class="p-2 border rounded flex-1">
-        <button id="addAdminBtn" class="bg-green-600 text-white px-4 py-2 rounded">Add</button>
-      </div>
-      <p id="adminMsg" class="mt-2 text-sm"></p>
-    </div>
+<body class="bg-gray-50 text-gray-800 min-h-screen">
 
-    <!-- Items Table -->
-    <div class="bg-white p-4 rounded shadow">
-      <h2 class="text-xl mb-3">Items & Status</h2>
-      <div class="mb-3">
-        <button id="refreshItems" class="bg-gray-600 text-white px-3 py-1 rounded text-sm">Refresh</button>
-      </div>
-      <div id="itemsTable" class="overflow-x-auto">
-        <table class="min-w-full table-auto text-sm">
-          <thead class="bg-gray-50">
-            <tr>
-              <th class="px-4 py-2 text-left">Item</th>
-              <th class="px-4 py-2 text-left">Location</th>
-              <th class="px-4 py-2 text-left">Price</th>
-              <th class="px-4 py-2 text-left">Status</th>
-            </tr>
-          </thead>
-          <tbody id="itemsBody"></tbody>
-        </table>
-      </div>
-    </div>
+    <div class="container mx-auto p-6 max-w-5xl">
 
-    <!-- Saved Carts -->
-    <div class="bg-white p-4 rounded shadow mt-6">
-      <h2 class="text-xl mb-3">Saved Carts</h2>
-      <button id="refreshCarts" class="mb-2 bg-gray-600 text-white px-3 py-1 rounded text-sm">Refresh</button>
-      <div id="cartsContainer" class="space-y-4 max-h-96 overflow-y-auto"></div>
-    </div>
-  </div>
+        <!-- Header -->
+        <header class="flex justify-between items-center mb-10 pb-6 border-b">
+            <div class="flex items-center gap-6">
+                <a href="index.html" class="text-indigo-600 hover:text-indigo-800 font-medium">
+                    ← Torna alla home
+                </a>
+                <h1 class="text-3xl font-bold">Admin Page</h1>
+            </div>
 
-  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-  <script src="admin.js"></script>
+            <div class="flex items-center gap-4">
+                <div id="userInfo" class="hidden flex items-center gap-3">
+                    <img id="userPhoto" class="w-10 h-10 rounded-full border-2 border-indigo-600" src="" alt="">
+                    <span id="userName" class="font-medium"></span>
+                </div>
+                <button id="logoutBtn"
+                    class="hidden bg-red-600 hover:bg-red-700 text-white px-5 py-2 rounded transition">
+                    Logout
+                </button>
+            </div>
+        </header>
+
+        <!-- Main Content (empty for now – we’ll fill it later) -->
+        <div class="bg-white rounded-lg shadow p-8 text-center text-gray-600">
+            <p class="text-xl">Benvenuto nella sezione Admin</p>
+            <p class="mt-4">Questa pagina è visibile solo agli amministratori.</p>
+            <p class="mt-8 text-5xl">Under Construction</p>
+        </div>
+
+    </div>
 </body>
+
 </html>
