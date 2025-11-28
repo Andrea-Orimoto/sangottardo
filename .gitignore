@@ -1,2 +1,3 @@
 carts/*
 !carts/.gitkeep
+data/status.json
