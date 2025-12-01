@@ -10,15 +10,14 @@
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script> <!-- QUESTA -->
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
     <script src="https://accounts.google.com/gsi/client" async defer></script>
     <script src="auth.js"></script>
-
-    <meta name="google-signin-client_id"
-        content="1049409960184-lt0jqecoman6nmnfgc94ntss04vemur2.apps.googleusercontent.com">
 </head>
 
 <body class="bg-gray-50 text-gray-800 min-h-screen">
+
     <div class="container mx-auto p-6 max-w-7xl">
         <header class="flex justify-between items-center mb-10 pb-6 border-b">
             <div class="flex items-center gap-6">
@@ -28,9 +27,8 @@
                 <h1 class="text-3xl font-bold">Admin</h1>
             </div>
             <div class="flex items-center gap-4">
-                <div id="googleSignIn"></div>
                 <div id="userInfo" class="hidden flex items-center gap-3">
-                    <img id="userPhoto" class="w-10 h-10 rounded-full border-2 border-indigo-600" src="" alt="">
+                    <img id="userPhoto" class="w-10 h-10 rounded-full border-2 border-indig o-600" src="" alt="">
                 </div>
                 <button id="logoutBtn"
                     class="hidden bg-red-600 hover:bg-red-700 text-white px-5 py-2 rounded transition">
@@ -104,7 +102,7 @@
         function waitForUser() {
             if (window.currentUser && window.currentUser.email) {
                 document.getElementById('userInfo').classList.remove('hidden');
-                document.getElementById('userPhoto').src = window.currentUser.photo || '';
+                document.getElementById('userPhoto').src = window.currentUser.picture || '';
                 document.getElementById('logoutBtn').classList.remove('hidden');
                 loadAllFavorites();
             } else {
@@ -150,18 +148,16 @@
                 });
             });
 
-            // Carica STATUS da Firebase (e aggiorna item.Status!)
             const statusSnapshot = await db.ref('status').once('value');
             const statusData = statusSnapshot.val() || {};
-            window.allStatus = statusData;  // per i badge in renderByUser / renderByItem
+            window.allStatus = statusData;
 
-            // Aggiorna lo status di ogni oggetto in allItems
             allItems.forEach(item => {
                 const fbStatus = statusData[item.UUID];
                 if (fbStatus && fbStatus.stato) {
-                    item.Status = fbStatus.stato;  // Venduto / Prenotato
+                    item.Status = fbStatus.stato;
                 } else {
-                    item.Status = '';               // Disponibile
+                    item.Status = '';
                 }
             });
 
@@ -170,7 +166,7 @@
             document.getElementById('loading').classList.add('hidden');
         }
 
-        // VISTA PER UTENTE – CON ID, SCATOLA, PREZZO
+        // VISTA PER UTENTE — invariata
         function renderByUser(data) {
             const container = document.getElementById('users-list');
             const grouped = {};
@@ -192,7 +188,6 @@
                         const statusInfo = window.allStatus?.[d.id] || {};
                         const currentStatus = item.Status || 'Disponibile';
 
-                        // Prezzo SOLO da Firebase (una volta sola!)
                         const prezzoVendita = statusInfo.prezzo && statusInfo.prezzo.trim() !== '' && statusInfo.prezzo !== '?'
                             ? statusInfo.prezzo
                             : null;
@@ -215,24 +210,46 @@
                             badge = `<div class="text-right"><span class="badge-disponibile">DISPONIBILE</span></div>`;
                         }
 
-                        return `
-                    <div class="flex flex-col sm:flex-row sm:items-center gap-4 py-4 border-b last:border-0">
-                        <img src="images/${item.Photos?.[0] || 'placeholder.jpg'}" 
-                             class="w-14 h-14 object-cover rounded flex-shrink-0" 
-                             onerror="this.src='images/placeholder.jpg'">
+                        const editButton = window.currentUser && window.isAdmin(window.currentUser) ? `
+                            <button onclick="event.stopPropagation(); openEditModal('${d.id}')"
+                                    class="absolute top-3 left-3 bg-white/85 hover:bg-white/95 backdrop-blur-sm rounded-full p-3 shadow-xl transition-all z-20 border-2 border-white">
+                                <svg class="w-6 h-6 text-indigo-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5"
+                                          d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+                                </svg>
+                            </button>` : '';
 
-                        <div class="flex-1 min-w-0">
-                            <div class="font-medium text-base">${item.Item}</div>
-                            <div class="text-xs text-gray-600 mt-1">
+                        const addedDate = d.added
+                            ? new Date(d.added).toLocaleDateString('it-IT', {
+                                day: '2-digit',
+                                month: 'short',
+                                year: 'numeric',
+                                hour: '2-digit',
+                                minute: '2-digit'
+                            }).replace(',', ' alle')
+                            : 'Data non disponibile';
+
+                        return `
+                    <div class="relative flex items-center gap-6 py-5 border-b last:border-0" data-uuid="${d.id}">
+                        <div class="relative">
+                            <img src="images/${item.Photos?.[0] || 'placeholder.jpg'}" 
+                                 class="w-24 h-24 object-cover rounded-2xl shadow-xl flex-shrink-0" 
+                                 onerror="this.src='images/placeholder.jpg'">
+                            ${editButton}
+                        </div>
+
+                        <div class="flex-1">
+                            <div class="font-bold text-lg sm:text-xl leading-tight">${item.Item}</div>
+                            <div class="text-sm text-gray-600 mt-1">
                                 ID: ${id} • Scatola: ${box}
                                 ${prezzoVendita ? ` • Prezzo: <strong>${prezzoVendita}</strong>` : ''}
+                            </div>
+                            <div class="text-xs text-gray-500 mt-1">
+                                Aggiunto: ${addedDate}
                             </div>
                         </div>
 
                         <div class="text-right">
-                            <div class="text-xs text-gray-500 mb-1">
-                                ${d.added ? new Date(d.added).toLocaleDateString('it-IT') : '—'}
-                            </div>
                             ${badge}
                         </div>
                     </div>
@@ -240,18 +257,18 @@
                     }).join('');
 
                 const card = document.createElement('div');
-                card.className = 'bg-white rounded-xl shadow-md p-6';
+                card.className = 'bg-white rounded-2xl shadow-lg p-8';
                 card.innerHTML = `
-            <h3 class="font-bold text-xl mb-5 text-indigo-700">${email} 
-                <span class="text-sm font-normal text-gray-500">(${grouped[email].length})</span>
+            <h3 class="font-bold text-2xl mb-6 text-indigo-700">${email} 
+                <span class="text-base font-normal text-gray-500">(${grouped[email].length})</span>
             </h3>
-            <div class="space-y-6">${items}</div>
+            <div class="space-y-4">${items}</div>
         `;
                 container.appendChild(card);
             });
         }
 
-        // VISTA PER OGGETTO – CON ID, SCATOLA, PREZZO
+        // VISTA PER OGGETTO — COMPATTA E BELLA
         function renderByItem(data) {
             const container = document.getElementById('items-list');
             const grouped = {};
@@ -274,7 +291,6 @@
                 const statusInfo = window.allStatus?.[uuid] || {};
                 const currentStatus = item.Status || 'Disponibile';
 
-                // Prezzo SOLO da Firebase (una volta sola!)
                 const prezzoVendita = statusInfo.prezzo && statusInfo.prezzo.trim() !== '' && statusInfo.prezzo !== '?'
                     ? statusInfo.prezzo
                     : null;
@@ -282,94 +298,89 @@
                 let badge = '';
                 if (currentStatus === 'Venduto') {
                     badge = `
-                <div class="text-right">
-                    <span class="badge-venduto">VENDUTO</span>
-                    ${statusInfo.vendutoA && statusInfo.data ? `
-                        <div class="text-xs text-gray-600 mt-2 leading-tight">
-                            a <strong>${statusInfo.vendutoA}</strong><br>
-                            il ${new Date(statusInfo.data).toLocaleDateString('it-IT')}
-                        </div>
-                    ` : ''}
-                </div>`;
+                        <div class="text-right">
+                            <span class="badge-venduto">VENDUTO</span>
+                            ${statusInfo.vendutoA && statusInfo.data ? `
+                                <div class="text-xs text-gray-600 mt-1 leading-tight">
+                                    a <strong>${statusInfo.vendutoA}</strong><br>
+                                    il ${new Date(statusInfo.data).toLocaleDateString('it-IT')}
+                                </div>
+                            ` : ''}
+                        </div>`;
                 } else if (currentStatus === 'Prenotato') {
                     badge = `<div class="text-right"><span class="badge-prenotato">PRENOTATO</span></div>`;
                 } else {
                     badge = `<div class="text-right"><span class="badge-disponibile">DISPONIBILE</span></div>`;
                 }
 
-                const users = grouped[uuid]
+                const editButton = window.currentUser && window.isAdmin(window.currentUser) ? `
+                    <button onclick="event.stopPropagation(); openEditModal('${uuid}')"
+                            class="absolute top-3 left-3 bg-white/85 hover:bg-white/95 backdrop-blur-sm rounded-full p-3 shadow-xl transition-all z-20 border-2 border-white">
+                        <svg class="w-6 h-6 text-indigo-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5"
+                                  d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+                        </svg>
+                    </button>` : '';
+
+                const usersList = grouped[uuid]
                     .sort((a, b) => new Date(a.added || 0) - new Date(b.added || 0))
-                    .map(u => `
-                <div class="text-sm">${u.email} — ${u.added ? new Date(u.added).toLocaleDateString('it-IT') : '—'}</div>
-            `).join('');
+                    .map(u => {
+                        const date = u.added
+                            ? new Date(u.added).toLocaleDateString('it-IT', {
+                                day: '2-digit',
+                                month: 'short',
+                                year: 'numeric',
+                                hour: '2-digit',
+                                minute: '2-digit'
+                            }).replace(',', ' alle')
+                            : '—';
+                        return `<div class="text-sm">${u.email}<span class="text-gray-500"> — ${date}</span></div>`;
+                    }).join('');
 
                 const card = document.createElement('div');
-                card.className = 'bg-white rounded-xl shadow-md p-6 border border-gray-100';
-
+                card.className = 'bg-white rounded-2xl shadow-lg p-6 hover:shadow-xl transition-shadow';
                 card.innerHTML = `
-            <div class="flex flex-col lg:flex-row gap-6">
-                <img src="images/${item.Photos?.[0] || 'placeholder.jpg'}" 
-                     class="w-28 h-28 object-cover rounded-lg shadow-md flex-shrink-0" 
-                     onerror="this.src='images/placeholder.jpg'">
+                    <div class="relative flex items-center gap-6 py-5 border-b border-gray-100 last:border-0" data-uuid="${uuid}">
+                        <div class="relative flex-shrink-0">
+                            <img src="images/${item.Photos?.[0] || 'placeholder.jpg'}" 
+                                 class="w-20 h-20 object-cover rounded-2xl shadow-lg" 
+                                 onerror="this.src='images/placeholder.jpg'">
+                            ${editButton}
+                        </div>
 
-                <div class="flex-1">
-                    <h3 class="font-bold text-2xl text-indigo-700 mb-3">${item.Item}</h3>
-                    <div class="grid grid-cols-2 gap-3 text-sm text-gray-700 mb-4">
-                        <div><strong>ID:</strong> ${id}</div>
-                        <div><strong>Scatola:</strong> ${box}</div>
-                        ${prezzoVendita ? `<div><strong>Prezzo:</strong> <strong>${prezzoVendita}</strong></div>` : '<div></div>'}
-                        <div><strong>Preferiti da:</strong> ${grouped[uuid].length} utente/i</div>
+                        <div class="flex-1 min-w-0">
+                            <div class="font-bold text-lg sm:text-xl leading-tight">${item.Item}</div>
+                            <div class="text-sm text-gray-600 mt-1">
+                                ID: ${id} • Scatola: ${box}
+                                ${prezzoVendita ? ` • Prezzo: <strong>${prezzoVendita}</strong>` : ''}
+                            </div>
+                        </div>
+
+                        <div class="text-right">
+                            ${badge}
+                        </div>
                     </div>
-                    ${users ? `<div class="pt-4 border-t text-sm space-y-1">${users}</div>` : ''}
-                </div>
 
-                ${badge}
-            </div>
-        `;
+                    ${usersList ? `
+                    <div class="pt-5">
+                        <div class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
+                            Aggiunto da (${grouped[uuid].length})
+                        </div>
+                        <div class="space-y-1 text-sm">
+                            ${usersList}
+                        </div>
+                    </div>` : ''}
+                `;
 
                 container.appendChild(card);
             });
         }
 
-        // SALVA STATUS – SOLO IN ADMIN.HTML
-        async function saveStatus(uuid, newStatus, vendutoA = '') {
-            // Controllo admin (doppio: UI + Firebase)
-            if (!window.currentUser || !window.isAdmin(window.currentUser)) {
-                alert('Accesso negato');
-                return;
-            }
-
-            // Torna Disponibile → rimuovi dal DB
-            if (newStatus === 'Disponibile') {
-                try {
-                    await db.ref('status/' + uuid).remove();
-                    alert('Oggetto tornato Disponibile');
-                    loadAllFavorites(); // ricarica admin
-                } catch (e) {
-                    alert('Errore');
-                }
-                return;
-            }
-
-            const payload = {
-                stato: newStatus,
-                data: new Date().toISOString().split('T')[0],
-                vendutoA: vendutoA.trim() || '—'
-            };
-
-            try {
-                await db.ref('status/' + uuid).set(payload);
-                alert(`Status aggiornato: ${newStatus}${vendutoA ? ' a ' + vendutoA : ''}`);
-                loadAllFavorites();
-            } catch (e) {
-                console.error(e);
-                alert('Errore salvataggio');
-            }
-        }
-
         // AVVIO
         waitForUser();
     </script>
+    <script src="edit-modal.js"></script>
+    <div id="toast"></div>
 </body>
 
 </html>
