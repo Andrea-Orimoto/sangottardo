@@ -326,55 +326,111 @@ function filterItems() {
 
 function setupFilters() {
   const sel = document.getElementById('catFilter');
-  const totalItems = allItems.length;
 
-  sel.innerHTML = '';
-  const allOption = document.createElement('option');
-  allOption.value = '';
-  allOption.textContent = `All Categories (${totalItems})`;
-  sel.appendChild(allOption);
+  // Crea dropdown Status UNA VOLTA SOLA (se non esiste)
+  let statusSel = document.getElementById('statusFilter');
+  if (!statusSel) {
+    statusSel = document.createElement('select');
+    statusSel.id = 'statusFilter';
+    statusSel.className = 'ml-2 p-2 border rounded';
+    statusSel.innerHTML = `<option value="">All Status</option><option value="Disponibile">Disponibile</option><option value="Venduto">Venduto</option>`;
+    document.querySelector('#filters').appendChild(statusSel);
+  }
 
-  const locations = [...new Set(allItems.map(i => i.Location).filter(Boolean))].sort();
-  const locationCount = {};
-  allItems.forEach(item => {
-    const loc = item.Location || 'Uncategorized';
-    locationCount[loc] = (locationCount[loc] || 0) + 1;
+  function updateCategoryCounts() {
+    const currentStatus = statusSel.value;
+    const filteredItems = filterItems(); // Usa il filtro Status corrente
+
+    sel.innerHTML = '';
+    const allOption = document.createElement('option');
+    allOption.value = '';
+    allOption.textContent = `All Categories (${filteredItems.length})`;
+    sel.appendChild(allOption);
+
+    const locationCount = {};
+    filteredItems.forEach(item => {
+      const loc = item.Location || 'Uncategorized';
+      locationCount[loc] = (locationCount[loc] || 0) + 1;
+    });
+
+    const locations = [...new Set(filteredItems.map(i => i.Location).filter(Boolean))].sort();
+    locations.forEach(loc => {
+      const opt = document.createElement('option');
+      opt.value = loc;
+      opt.textContent = `${loc} (${locationCount[loc]})`;
+      sel.appendChild(opt);
+    });
+  }
+
+  // Aggiorna alla prima apertura
+  updateCategoryCounts();
+
+  // Listener per Status — ricalcola categorie
+  statusSel.addEventListener('change', () => {
+    displayed = 0;
+    renderGrid();
+    updateCategoryCounts();
   });
 
-  locations.forEach(loc => {
-    const opt = document.createElement('option');
-    opt.value = loc;
-    opt.textContent = `${loc} (${locationCount[loc]})`;
-    sel.appendChild(opt);
-  });
-
-  const statusSel = document.createElement('select');
-  statusSel.id = 'statusFilter';
-  statusSel.className = 'ml-2 p-2 border rounded';
-  statusSel.innerHTML = `<option value="">All Status</option><option value="Disponibile">Disponibile</option><option value="Venduto">Venduto</option>`;
-  statusSel.addEventListener('change', () => { displayed = 0; renderGrid(); });
-  document.querySelector('#filters').appendChild(statusSel);
-
+  // Listener per ricerca
   let timeout;
   document.getElementById('search').addEventListener('input', () => {
     clearTimeout(timeout);
-    timeout = setTimeout(() => { displayed = 0; renderGrid(); }, 300);
+    timeout = setTimeout(() => {
+      displayed = 0;
+      renderGrid();
+      updateCategoryCounts();
+    }, 300);
   });
 
+  // Listener per categoria
   sel.addEventListener('change', () => {
-    displayed = 0; renderGrid();
+    displayed = 0;
+    renderGrid();
     const url = new URL(window.location);
     sel.value ? url.searchParams.set('cat', sel.value) : url.searchParams.delete('cat');
     window.history.replaceState({}, '', url);
   });
 
+  // Ripristina da URL
   const urlParams = new URLSearchParams(window.location.search);
   const urlCat = urlParams.get('cat');
   if (urlCat) {
     setTimeout(() => {
       const option = sel.querySelector(`option[value="${urlCat}"]`);
-      if (option) { sel.value = urlCat; sel.dispatchEvent(new Event('change')); }
+      if (option) {
+        sel.value = urlCat;
+        sel.dispatchEvent(new Event('change'));
+      }
     }, 100);
+  }
+
+  // BOTTONE CLEAR FILTERS
+  const clearBtn = document.getElementById('clearFilters');
+  clearBtn.parentNode.insertBefore(statusSel, clearBtn);
+  if (clearBtn) {
+    clearBtn.addEventListener('click', () => {
+      // Resetta dropdown
+      sel.value = '';
+      statusSel.value = '';
+
+      // ←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←
+      // RESET DELLA SEARCH BOX
+      document.getElementById('search').value = '';
+      // ←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←
+
+      // Resetta griglia
+      displayed = 0;
+      renderGrid();
+
+      // Aggiorna i conteggi delle categorie
+      updateCategoryCounts();
+
+      // Pulisci l'URL
+      const url = new URL(window.location);
+      url.searchParams.delete('cat');
+      window.history.replaceState({}, '', url);
+    });
   }
 }
 
@@ -389,6 +445,27 @@ function renderGrid(loadMore = false) {
   const filtered = filterItems();
   const start = displayed;
   const end = Math.min(start + PAGE_SIZE, filtered.length);
+
+  // ←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←
+  // MESSAGGIO "NESSUN RISULTATO" PERSONALIZZATO
+  if (filtered.length === 0) {
+    const cat = document.getElementById('catFilter').value || 'tutte le categorie';
+    const status = document.getElementById('statusFilter')?.value || 'tutti gli stati';
+    const statusText = status === 'Disponibile' ? 'disponibili' :
+      status === 'Venduto' ? 'venduti' : status;
+
+    const message = document.createElement('div');
+    message.className = 'col-span-full text-center py-12 text-gray-500';
+    message.innerHTML = `
+      <p class="text-lg">Nessun risultato per</p>
+      <p class="text-xl font-medium mt-2">${cat} — ${statusText}</p>
+      <p class="text-sm mt-4">Prova a cambiare i filtri o la ricerca</p>
+    `;
+    container.appendChild(message);
+    document.getElementById('loadMore').classList.add('hidden');
+    renderPreferitiSidebar();
+    return;
+  }
 
   for (let i = start; i < end; i++) {
     const item = filtered[i];
@@ -540,7 +617,7 @@ function openModal(item) {
 function closeModal() {
   document.getElementById('modal').classList.add('hidden');
   document.querySelector('.swiper button[data-heart]')?.remove();
-  
+
   if (currentSwiper) {
     currentSwiper.destroy(true, true);
     currentSwiper = null;
