@@ -166,15 +166,20 @@
             document.getElementById('loading').classList.add('hidden');
         }
 
-        // VISTA PER UTENTE — invariata
+        // VISTA PER UTENTE
         function renderByUser(data) {
             const container = document.getElementById('users-list');
             container.innerHTML = ''; // clear previous content
 
             const grouped = {};
+            const favoritesByItem = {};
+
             data.forEach(d => {
                 if (!grouped[d.email]) grouped[d.email] = [];
                 grouped[d.email].push(d);
+
+                if (!favoritesByItem[d.id]) favoritesByItem[d.id] = [];
+                favoritesByItem[d.id].push({ email: d.email, added: d.added });
             });
 
             Object.keys(grouped).sort().forEach(email => {
@@ -230,15 +235,20 @@
                             : 'Data non disponibile';
 
                         return `
-                    <div class="relative flex items-center gap-6 py-5 border-b last:border-0" data-uuid="${d.id}">
-                        <div class="relative">
-                            <img src="images/${item.Photos?.[0] || 'placeholder.jpg'}" 
-                                 class="w-24 h-24 object-cover rounded-2xl shadow-xl flex-shrink-0" 
-                                 onerror="this.src='images/placeholder.jpg'">
-                            ${editButton}
+                    <div class="relative flex items-start gap-6 py-5 border-b last:border-0" data-uuid="${d.id}">
+                        <div class="flex-shrink-0 w-24">
+                            <div class="relative">
+                                <img src="images/${item.Photos?.[0] || 'placeholder.jpg'}" 
+                                     class="w-24 h-24 object-cover rounded-2xl shadow-xl" 
+                                     onerror="this.src='images/placeholder.jpg'">
+                                ${editButton}
+                            </div>
+                            <div class="mt-3 text-center">
+                                ${badge}
+                            </div>
                         </div>
 
-                        <div class="flex-1">
+                        <div class="flex-1 min-w-0 break-words">
                             <div class="font-bold text-lg sm:text-xl leading-tight">${item.Item}</div>
                             <div class="text-sm text-gray-600 mt-1">
                                 ID: ${id} • Scatola: ${box}
@@ -247,10 +257,20 @@
                             <div class="text-xs text-gray-500 mt-1">
                                 Aggiunto: ${addedDate}
                             </div>
-                        </div>
+                            ${(() => {
+                                const otherUsers = (favoritesByItem[d.id] || [])
+                                    .filter(u => u.email !== email)
+                                    .sort((a, b) => new Date(a.added || 0) - new Date(b.added || 0));
 
-                        <div class="text-right">
-                            ${badge}
+                                if (otherUsers.length === 0) return '';
+
+                                return `
+                                    <div class="text-xs text-gray-600 mt-2">
+                                        <span class="font-semibold">Aggiunto anche da:</span>
+                                        ${otherUsers.map(u => u.email).join(', ')}
+                                    </div>
+                                `;
+                            })()}
                         </div>
                     </div>
                 `;
@@ -360,24 +380,25 @@
                 const card = document.createElement('div');
                 card.className = 'bg-white rounded-2xl shadow-lg p-6 hover:shadow-xl transition-shadow';
                 card.innerHTML = `
-                    <div class="relative flex items-center gap-6 py-5 border-b border-gray-100 last:border-0" data-uuid="${uuid}">
-                        <div class="relative flex-shrink-0">
-                            <img src="images/${item.Photos?.[0] || 'placeholder.jpg'}" 
-                                 class="w-20 h-20 object-cover rounded-2xl shadow-lg" 
-                                 onerror="this.src='images/placeholder.jpg'">
-                            ${editButton}
+                    <div class="relative flex items-start gap-6 py-5 border-b border-gray-100 last:border-0" data-uuid="${uuid}">
+                        <div class="flex-shrink-0 w-20">
+                            <div class="relative">
+                                <img src="images/${item.Photos?.[0] || 'placeholder.jpg'}" 
+                                     class="w-20 h-20 object-cover rounded-2xl shadow-lg" 
+                                     onerror="this.src='images/placeholder.jpg'">
+                                ${editButton}
+                            </div>
+                            <div class="mt-3 text-center">
+                                ${badge}
+                            </div>
                         </div>
 
-                        <div class="flex-1 min-w-0">
+                        <div class="flex-1 min-w-0 break-words">
                             <div class="font-bold text-lg sm:text-xl leading-tight">${item.Item}</div>
                             <div class="text-sm text-gray-600 mt-1">
                                 ID: ${id} • Scatola: ${box}
                                 ${prezzoVendita ? ` • Prezzo: <strong>${prezzoVendita}</strong>` : ''}
                             </div>
-                        </div>
-
-                        <div class="text-right">
-                            ${badge}
                         </div>
                     </div>
 
